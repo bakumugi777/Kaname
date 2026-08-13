@@ -1,0 +1,380 @@
+Kaname Configuration Guide (English)
+====================================
+
+Applies to: configuration schema 1 / Quickshell 0.3.0
+
+
+1. Configuration file locations
+-------------------------------
+
+Kaname normally uses these files:
+
+  ~/.config/kaname/config.json
+      Geometry, opacity, animation, themes, displays, and profiles.
+
+  ~/.config/kaname/menus.json
+      User menus, submenus, commands, and providers.
+
+  ~/.cache/matugen/kaname-colors.json
+      The generated matugen palette watched by Kaname.
+
+Install initial copies with:
+
+  mkdir -p ~/.config/kaname
+  cp config/default.json ~/.config/kaname/config.json
+  cp config/menus.json ~/.config/kaname/menus.json
+  cp matugen/kaname-colors.json.template ~/.config/kaname/
+
+config.json and menus.json are watched at runtime. Saving valid JSON normally
+applies changes without restarting Quickshell. Invalid updates leave the last
+valid configuration active.
+
+The locations can be overridden with:
+
+  KANAME_CONFIG_FILE   Path to config.json
+  KANAME_MENUS_FILE    Path to menus.json
+  KANAME_THEME_FILE    Path to the generated theme JSON
+
+
+2. JSON rules
+-------------
+
+* JSON does not support comments.
+* Keys and strings require double quotes.
+* Do not put a comma after the last member.
+* Every configuration file requires "schemaVersion": 1.
+* Opacity ranges from 0.0 (transparent) to 1.0 (opaque).
+* Commands must be argument arrays, never implicit shell strings.
+
+Validation:
+
+  jq empty ~/.config/kaname/config.json
+  jq empty ~/.config/kaname/menus.json
+
+
+3. config.json
+--------------
+
+Complete example:
+
+  {
+    "schemaVersion": 1,
+    "geometry": {
+      "width": 1100,
+      "height": 900,
+      "centerOffsetX": -100,
+      "centerOffsetY": 30,
+      "radius": 760,
+      "startAngle": 195,
+      "endAngle": 270,
+      "visibleItems": 7,
+      "itemWidth": 150,
+      "itemHeight": 104
+    },
+    "opacity": {
+      "master": 1.0,
+      "background": 0.72,
+      "overlay": 0.10,
+      "item": 0.92,
+      "inactive": 0.50,
+      "guide": 0.32,
+      "fan": 0.22,
+      "text": 1.0,
+      "image": 1.0
+    },
+    "behavior": {
+      "closeOnFocusLoss": false,
+      "animationMs": 180,
+      "themeAnimationMs": 350,
+      "reducedMotion": false,
+      "cacheRadius": 1
+    },
+    "theme": { "preset": "matugen" },
+    "display": { "screen": "" },
+    "profiles": {}
+  }
+
+
+3.1 geometry
+
+  width / height
+      Layer-shell surface size. Input ranges are width 320-4096 and height
+      240-4096. The current bottom-right layout enforces a rendered minimum of
+      1100x900 to prevent clipping.
+
+  centerOffsetX / centerOffsetY
+      Offset of the virtual circle center from the bottom-right corner. A
+      negative X moves left; a positive Y moves down. Range: -1000 to 1000.
+
+  radius
+      Item-track radius. Input range: 80-2000. The renderer uses at least 760,
+      or a larger automatically calculated radius when needed to prevent item
+      overlap.
+
+  startAngle / endAngle
+      Fan angles in degrees. About 195-270 is the baseline for bottom-right
+      placement. The rendered span is at least 75 degrees.
+
+  visibleItems
+      Number of simultaneous items, from 1 to 15. Odd values such as 5 or 7
+      provide a natural center slot.
+
+  itemWidth / itemHeight
+      Item dimensions, from 48 to 500 pixels.
+
+
+3.2 opacity
+
+  master       Entire UI
+  item         Normal items
+  inactive     Unselected items
+  guide        Circular guide line
+  fan          Black fan surface
+  text         Center text
+  image        Thumbnails
+
+background and overlay remain for schema compatibility. The current fully
+transparent window does not draw a full-surface background, so these two values
+have no visible effect.
+
+
+3.3 behavior
+
+  animationMs
+      Base duration for selection, rotation, and open/close motion. 0-2000 ms.
+
+  themeAnimationMs
+      Color-transition duration. 0-5000 ms.
+
+  reducedMotion
+      Set true to make primary animation durations zero.
+
+  cacheRadius
+      Number of off-arc items to prefetch, from 0 to 5. Images are decoded
+      asynchronously at a reduced size and use Qt's in-memory cache.
+
+closeOnFocusLoss is reserved for future compatibility. Focus loss does not
+currently close Kaname.
+
+
+3.4 theme
+
+  preset: "matugen" | "dark" | "neon" | "mono"
+
+Only matugen watches ~/.cache/matugen/kaname-colors.json. The other choices are
+built-in fixed palettes.
+
+
+3.5 display
+
+  screen
+      A Niri/Quickshell output name, for example "eDP-1" or "DP-1". An empty or
+      unknown name falls back to Quickshell's default output.
+
+Examples:
+
+  niri msg outputs
+  ./bin/kaname --applications --screen eDP-1
+
+The CLI --screen option overrides config.json for that request.
+
+
+3.6 profiles
+
+Profiles override selected base geometry and opacity values. Missing members
+fall back to the base settings. All geometry keys are supported. Current profile
+opacity overrides are master, item, inactive, image, and fan.
+
+  "profiles": {
+    "my-wallpaper": {
+      "geometry": {
+        "visibleItems": 5,
+        "itemWidth": 240,
+        "itemHeight": 150,
+        "radius": 840
+      },
+      "opacity": {
+        "fan": 0.16,
+        "inactive": 0.38
+      }
+    }
+  }
+
+Use a profile with:
+
+  find ~/.wallpapers/image -type f | sed 's|^|img:|' |
+    ./bin/kaname --dmenu --profile my-wallpaper
+
+Bundled profiles are applications, wallpaper-image, wallpaper-video, and
+compact.
+
+
+4. menus.json
+-------------
+
+Basic structure:
+
+  {
+    "schemaVersion": 1,
+    "menus": {
+      "main": {
+        "label": "Kaname",
+        "items": []
+      }
+    }
+  }
+
+Open it with:
+
+  ./bin/kaname --menu main
+
+
+4.1 Common item fields
+
+  id               Unique ID; generated when omitted
+  type             Item type
+  label            Display label
+  description      Description in the center area
+  icon             Icon-theme name
+  image            Absolute image path
+  value            Item value
+  keywords         Array of search strings
+  key              Binding local to the current menu level
+  disabled         true prevents activation
+  workingDirectory Working directory for a command
+
+Bindings are local to the current level. Escape or Backspace outside search
+returns to the parent.
+
+
+4.2 applications
+
+Opens the XDG desktop-entry list.
+
+  {
+    "id": "apps",
+    "type": "applications",
+    "label": "Applications",
+    "icon": "view-app-grid-symbolic",
+    "key": "a"
+  }
+
+
+4.3 command
+
+Runs an executable and arguments without an implicit shell.
+
+  {
+    "id": "files",
+    "type": "command",
+    "label": "Files",
+    "icon": "system-file-manager",
+    "command": ["nautilus", "--new-window"]
+  }
+
+This is not supported:
+
+  "command": "program --option | other-program"
+
+For pipes, redirection, or expansion, create a separately reviewed script and
+invoke that script as an argument array.
+
+
+4.4 submenu
+
+  {
+    "id": "tools",
+    "type": "submenu",
+    "label": "Tools",
+    "children": [
+      {
+        "id": "terminal",
+        "type": "command",
+        "label": "Terminal",
+        "command": ["foot"]
+      }
+    ]
+  }
+
+
+4.5 provider
+
+Reads dynamic child items from an external program's stdout. command is always
+an argument array.
+
+  {
+    "id": "sessions",
+    "type": "provider",
+    "label": "Sessions",
+    "command": ["list-sessions", "--json"],
+    "inputFormat": "jsonl"
+  }
+
+inputFormat values:
+
+  lines
+      One display-only item per line.
+
+  jsonl
+      One JSON object per line. It can return actionable items.
+
+Providers are displayed after EOF. Kaname shows Loading while running, No
+results for empty output, and an error item containing stderr on failure.
+
+Example JSON Lines from a provider:
+
+  {"id":"term","type":"command","label":"Terminal","command":["foot"]}
+  {"id":"files","type":"command","label":"Files","command":["nautilus"]}
+
+
+5. dmenu JSON Lines
+-------------------
+
+  printf '%s\n' \
+    '{"id":"one","label":"One","value":"1","keywords":["first"]}' \
+    '{"id":"two","label":"Two","value":"2","image":"/tmp/two.webp"}' |
+    ./bin/kaname --jsonl --output value --prompt Structured
+
+Available fields:
+
+  id, label, description, icon, image, value, keywords, key, disabled
+
+--output modes:
+
+  raw     Exact original JSON line (default)
+  value   value
+  id      id
+  json    JSON object retained by Kaname
+
+Malformed input exits with status 2 and writes the error only to stderr.
+
+
+6. matugen theme JSON
+---------------------
+
+Required keys are schemaVersion, background, primary, and text. Other keys are
+optional, but the supplied template generates:
+
+  background, surface, surfaceContainer, primary, secondary, tertiary,
+  outline, text, textMuted, error
+
+Colors use "#RRGGBB". Opacity belongs in config.json, not in the theme file.
+Kaname retains the last valid palette when a broken theme update is detected.
+
+
+7. Precedence and troubleshooting
+---------------------------------
+
+Value precedence:
+
+  CLI option > selected profile > base config.json > built-in QML value
+
+If a change is not applied:
+
+  1. Validate JSON with jq empty.
+  2. Inspect logs:
+     quickshell log -p /home/shin/Desktop/dev/kaname/quickshell -t 100
+  3. Restart Quickshell if needed:
+
+     quickshell kill -p "$PWD/quickshell"
+     quickshell -p "$PWD/quickshell" --daemonize

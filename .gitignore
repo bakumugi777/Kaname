@@ -1,0 +1,22 @@
+  # Crash dumps
+  core
+  core.*
+
+  # Verification/reference media
+  検証用/
+  参考用/
+  右下に広がる要ランチャー.png
+
+  # Local agent metadata
+  .agents/
+  .codex/
+
+  # Runtime/cache files
+  *.log
+  *.pid
+  .cache/
+  result
+  result-*
+
+  連携スクリプト
+  起動.txt

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "menus": {
+    "main": {
+      "label": "要",
+      "items": [
+        {
+          "id": "applications",
+          "type": "applications",
+          "label": "Applications",
+          "description": "XDG applications",
+          "icon": "view-app-grid-symbolic",
+          "key": "a"
+        },
+        {
+          "id": "tools",
+          "type": "submenu",
+          "label": "Tools",
+          "icon": "folder",
+          "key": "t",
+          "children": [
+            {
+              "id": "terminal",
+              "type": "command",
+              "label": "Terminal",
+              "description": "Configured terminal example",
+              "icon": "utilities-terminal",
+              "key": "t",
+              "command": ["foot"]
+            }
+          ]
+        },
+        {
+          "id": "provider-example",
+          "type": "provider",
+          "label": "Dynamic example",
+          "description": "Candidates produced by an external process",
+          "icon": "view-refresh",
+          "key": "d",
+          "command": ["printf", "Alpha\nBeta\nGamma\n"],
+          "inputFormat": "lines"
+        }
+      ]
+    }
+  }
+}

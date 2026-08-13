@@ -1,0 +1,372 @@
+Kaname 設定ガイド（日本語）
+============================
+
+対象バージョン: 設定スキーマ 1 / Quickshell 0.3.0
+
+
+1. 設定ファイルの場所
+---------------------
+
+通常は次の3ファイルを使用します。
+
+  ~/.config/kaname/config.json
+      形状、透明度、アニメーション、テーマ、モニター、プロファイル
+
+  ~/.config/kaname/menus.json
+      ユーザー定義メニュー、サブメニュー、コマンド、provider
+
+  ~/.cache/matugen/kaname-colors.json
+      matugenが生成し、Kanameが監視するテーマ色
+
+初期ファイルは次のように配置できます。
+
+  mkdir -p ~/.config/kaname
+  cp config/default.json ~/.config/kaname/config.json
+  cp config/menus.json ~/.config/kaname/menus.json
+  cp matugen/kaname-colors.json.template ~/.config/kaname/
+
+config.jsonとmenus.jsonは実行中に監視されます。正しいJSONへ保存すると、通常は
+Quickshellの再起動なしで反映されます。JSONが壊れている場合は直前の有効な設定を
+維持します。
+
+環境変数で場所を変更できます。
+
+  KANAME_CONFIG_FILE   config.json
+  KANAME_MENUS_FILE    menus.json
+  KANAME_THEME_FILE    生成済みテーマJSON
+
+
+2. JSON記述上の注意
+-------------------
+
+・コメントは書けません。
+・文字列とキーはダブルクォートで囲みます。
+・最後の要素の後にはカンマを書きません。
+・すべての設定ファイルで "schemaVersion": 1 が必要です。
+・透明度は0.0（完全透明）から1.0（不透明）です。
+・コマンドはシェル文字列ではなく、必ず引数配列で指定します。
+
+検査例:
+
+  jq empty ~/.config/kaname/config.json
+  jq empty ~/.config/kaname/menus.json
+
+
+3. config.json
+--------------
+
+完全な例:
+
+  {
+    "schemaVersion": 1,
+    "geometry": {
+      "width": 1100,
+      "height": 900,
+      "centerOffsetX": -100,
+      "centerOffsetY": 30,
+      "radius": 760,
+      "startAngle": 195,
+      "endAngle": 270,
+      "visibleItems": 7,
+      "itemWidth": 150,
+      "itemHeight": 104
+    },
+    "opacity": {
+      "master": 1.0,
+      "background": 0.72,
+      "overlay": 0.10,
+      "item": 0.92,
+      "inactive": 0.50,
+      "guide": 0.32,
+      "fan": 0.22,
+      "text": 1.0,
+      "image": 1.0
+    },
+    "behavior": {
+      "closeOnFocusLoss": false,
+      "animationMs": 180,
+      "themeAnimationMs": 350,
+      "reducedMotion": false,
+      "cacheRadius": 1
+    },
+    "theme": { "preset": "matugen" },
+    "display": { "screen": "" },
+    "profiles": {}
+  }
+
+
+3.1 geometry
+
+  width / height
+      layer-shellウィンドウの幅と高さ。入力範囲はwidth 320～4096、height
+      240～4096です。現在の右下レイアウトでは見切れ防止のため、実表示は最低
+      1100×900になります。
+
+  centerOffsetX / centerOffsetY
+      仮想円の中心を画面右下からずらす量。負のXは左、正のYは下です。
+      範囲は-1000～1000です。
+
+  radius
+      項目軌道の半径。入力範囲は80～2000です。重なり防止のため、実際には
+      760以上か、項目寸法から求めた必要半径の大きい方が使われます。
+
+  startAngle / endAngle
+      扇の角度（度）。現在の右下配置では195～270程度が基準です。表示範囲は
+      最低75度に補正されます。
+
+  visibleItems
+      同時表示数。1～15。通常は奇数（5または7）が中央配置に向いています。
+
+  itemWidth / itemHeight
+      各項目の寸法。48～500px。
+
+
+3.2 opacity
+
+  master       UI全体
+  item         通常項目
+  inactive     非選択項目
+  guide        円弧ガイド線
+  fan          黒い扇背景
+  text         中央テキスト
+  image        サムネイル
+
+backgroundとoverlayはスキーマ互換用に残っています。現在の「完全に透明な
+ウィンドウ」表示では全面背景を描かないため、視覚効果はありません。
+
+
+3.3 behavior
+
+  animationMs
+      選択、回転、開閉の基本時間。0～2000ミリ秒。
+
+  themeAnimationMs
+      色変更の遷移時間。0～5000ミリ秒。
+
+  reducedMotion
+      trueなら主要アニメーション時間を0にします。
+
+  cacheRadius
+      表示範囲の外側で先読みする項目数。0～5。画像は非同期縮小デコードされ、
+      Qtのメモリキャッシュを利用します。
+
+closeOnFocusLossは将来互換用の予約キーです。現在はフォーカス喪失で閉じません。
+
+
+3.4 theme
+
+  preset: "matugen" | "dark" | "neon" | "mono"
+
+matugenの場合だけ、~/.cache/matugen/kaname-colors.jsonを監視します。それ以外は
+内蔵固定テーマです。
+
+
+3.5 display
+
+  screen
+      Niri/Quickshellの出力名。例: "eDP-1"、"DP-1"。空文字または未知の名前は
+      Quickshellの既定出力へフォールバックします。
+
+確認:
+
+  niri msg outputs
+  ./bin/kaname --applications --screen eDP-1
+
+CLIの--screenはconfig.jsonより優先されます。
+
+
+3.6 profiles
+
+プロファイルは基本geometry/opacityの一部だけを上書きします。未指定値は基本設定へ
+フォールバックします。geometryでは全キー、opacityではmaster、item、inactive、
+image、fanを現在上書きできます。
+
+  "profiles": {
+    "my-wallpaper": {
+      "geometry": {
+        "visibleItems": 5,
+        "itemWidth": 240,
+        "itemHeight": 150,
+        "radius": 840
+      },
+      "opacity": {
+        "fan": 0.16,
+        "inactive": 0.38
+      }
+    }
+  }
+
+使用:
+
+  find ~/.wallpapers/image -type f | sed 's|^|img:|' |
+    ./bin/kaname --dmenu --profile my-wallpaper
+
+同梱プロファイルはapplications、wallpaper-image、wallpaper-video、compactです。
+
+
+4. menus.json
+-------------
+
+基本構造:
+
+  {
+    "schemaVersion": 1,
+    "menus": {
+      "main": {
+        "label": "要",
+        "items": []
+      }
+    }
+  }
+
+起動:
+
+  ./bin/kaname --menu main
+
+
+4.1 共通項目フィールド
+
+  id              一意なID。省略時は自動生成
+  type            項目種別
+  label           表示名
+  description     中央領域の説明
+  icon            アイコンテーマ名
+  image           絶対画像パス
+  value           値
+  keywords        検索語の文字列配列
+  key             現在階層内のキーバインド
+  disabled        trueなら選択不能
+  workingDirectory コマンドの作業ディレクトリ
+
+keyは現在の階層だけで有効です。Escapeまたは通常時のBackspaceで親へ戻ります。
+
+
+4.2 applications
+
+XDGデスクトップエントリ一覧を開きます。
+
+  {
+    "id": "apps",
+    "type": "applications",
+    "label": "Applications",
+    "icon": "view-app-grid-symbolic",
+    "key": "a"
+  }
+
+
+4.3 command
+
+シェルを介さず、実行ファイルと引数をそのまま渡します。
+
+  {
+    "id": "files",
+    "type": "command",
+    "label": "Files",
+    "icon": "system-file-manager",
+    "command": ["nautilus", "--new-window"]
+  }
+
+次の形式は使用できません。
+
+  "command": "program --option | other-program"
+
+パイプ、リダイレクト、環境変数展開が必要なら、内容を検証した専用スクリプトを作り、
+そのスクリプトを配列で呼び出してください。
+
+
+4.4 submenu
+
+  {
+    "id": "tools",
+    "type": "submenu",
+    "label": "Tools",
+    "children": [
+      {
+        "id": "terminal",
+        "type": "command",
+        "label": "Terminal",
+        "command": ["foot"]
+      }
+    ]
+  }
+
+
+4.5 provider
+
+外部プログラムのstdoutを動的な子項目として読みます。commandは必ず配列です。
+
+  {
+    "id": "sessions",
+    "type": "provider",
+    "label": "Sessions",
+    "command": ["list-sessions", "--json"],
+    "inputFormat": "jsonl"
+  }
+
+inputFormat:
+
+  lines
+      1行を1項目として表示します。現在のlines項目は表示専用です。
+
+  jsonl
+      1行を1 JSONオブジェクトとして読みます。実行可能項目を返せます。
+
+providerはEOFまで読み取った後に一括表示します。実行中はLoading、空ならNo results、
+失敗時はstderr付きエラーを表示します。
+
+providerが返すJSON Lines例:
+
+  {"id":"term","type":"command","label":"Terminal","command":["foot"]}
+  {"id":"files","type":"command","label":"Files","command":["nautilus"]}
+
+
+5. dmenu JSON Lines
+-------------------
+
+  printf '%s\n' \
+    '{"id":"one","label":"One","value":"1","keywords":["first"]}' \
+    '{"id":"two","label":"Two","value":"2","image":"/tmp/two.webp"}' |
+    ./bin/kaname --jsonl --output value --prompt Structured
+
+利用可能なフィールド:
+
+  id, label, description, icon, image, value, keywords, key, disabled
+
+--output:
+
+  raw     入力された元のJSON行（既定）
+  value   value
+  id      id
+  json    Kanameが保持するJSONオブジェクト
+
+壊れた行は終了コード2になり、エラーはstderrだけへ出ます。
+
+
+6. matugenテーマJSON
+--------------------
+
+必要キーはschemaVersion、background、primary、textです。他のキーは任意ですが、
+テンプレートでは次を生成します。
+
+  background, surface, surfaceContainer, primary, secondary, tertiary,
+  outline, text, textMuted, error
+
+色は"#RRGGBB"形式です。透明度はテーマJSONではなくconfig.jsonで管理します。
+壊れたテーマへ更新された場合、Kanameは直前の有効テーマを維持します。
+
+
+7. 優先順位とトラブルシューティング
+-------------------------------------
+
+値の優先順位:
+
+  CLIオプション > 指定プロファイル > config.json基本値 > QML内蔵値
+
+設定を反映できない場合:
+
+  1. jq emptyでJSONを検査する
+  2. quickshell log -p /home/shin/Desktop/dev/kaname/quickshell -t 100
+  3. 必要ならQuickshellを再起動する
+
+  quickshell kill -p "$PWD/quickshell"
+  quickshell -p "$PWD/quickshell" --daemonize

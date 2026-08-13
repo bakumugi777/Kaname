@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "background": "{{colors.background.default.hex}}",
+  "surface": "{{colors.surface.default.hex}}",
+  "surfaceContainer": "{{colors.surface_container.default.hex}}",
+  "primary": "{{colors.primary.default.hex}}",
+  "secondary": "{{colors.secondary.default.hex}}",
+  "tertiary": "{{colors.tertiary.default.hex}}",
+  "outline": "{{colors.outline.default.hex}}",
+  "text": "{{colors.on_background.default.hex}}",
+  "textMuted": "{{colors.on_surface_variant.default.hex}}",
+  "error": "{{colors.error.default.hex}}"
+}

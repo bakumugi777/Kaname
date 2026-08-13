@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "geometry": {
+    "width": 1100,
+    "height": 900,
+    "centerOffsetX": -100,
+    "centerOffsetY": 30,
+    "radius": 760,
+    "startAngle": 180,
+    "endAngle": 270,
+    "visibleItems": 7,
+    "itemWidth": 150,
+    "itemHeight": 104
+  },
+  "opacity": {
+    "master": 1.0,
+    "background": 0.72,
+    "overlay": 0.10,
+    "item": 0.92,
+    "inactive": 0.50,
+    "guide": 0.32,
+    "fan": 0.22,
+    "text": 1.0,
+    "image": 1.0
+  },
+  "behavior": {
+    "closeOnFocusLoss": false,
+    "animationMs": 180,
+    "themeAnimationMs": 350,
+    "reducedMotion": false,
+    "cacheRadius": 1
+  },
+  "theme": {
+    "preset": "matugen"
+  },
+  "display": {
+    "screen": ""
+  },
+  "profiles": {
+    "applications": {
+      "geometry": { "visibleItems": 7, "itemWidth": 150, "itemHeight": 104 }
+    },
+    "wallpaper-image": {
+      "geometry": { "visibleItems": 5, "itemWidth": 220, "itemHeight": 140, "radius": 820 }
+    },
+    "wallpaper-video": {
+      "geometry": { "visibleItems": 5, "itemWidth": 210, "itemHeight": 132, "radius": 800 }
+    },
+    "compact": {
+      "geometry": { "visibleItems": 5, "itemWidth": 124, "itemHeight": 88 }
+    }
+  }
+}

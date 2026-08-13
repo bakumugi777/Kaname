@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Open the built-in hierarchy navigation fixture without changing menus.json.
+set -u
+
+qs_bin=${KANAME_QS_BIN:-quickshell}
+qml_dir=${KANAME_QML_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/quickshell"}
+screen=${1:-}
+
+call_demo() {
+  "$qs_bin" ipc -p "$qml_dir" call kaname showHierarchyDemo "$screen" >/dev/null 2>&1
+}
+
+if ! call_demo; then
+  if [[ ${KANAME_NO_AUTOSTART:-0} == 1 ]]; then
+    printf '%s\n' 'kaname-hierarchy-demo: could not contact Quickshell' >&2
+    exit 3
+  fi
+  "$qs_bin" -p "$qml_dir" --daemonize >/dev/null 2>&1 || true
+  for _ in $(seq 1 50); do
+    call_demo && exit 0
+    sleep 0.05
+  done
+  printf '%s\n' 'kaname-hierarchy-demo: could not contact Quickshell' >&2
+  exit 3
+fi

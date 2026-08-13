@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+set -u
+
+usage() {
+  printf '%s\n' 'usage: kaname (--dmenu [--jsonl] [--output raw|value|id|json] [--prompt TEXT] [--profile NAME] | --wallpaper --images FILE --videos FILE | --applications | --menu NAME) [--screen NAME]' >&2
+}
+
+prompt=""
+profile="default"
+mode=""
+menu_name=""
+input_format="lines"
+output_mode="raw"
+screen=""
+images_file=""
+videos_file=""
+while (($#)); do
+  case "$1" in
+    --dmenu) mode="dmenu"; shift ;;
+    --jsonl) mode="dmenu"; input_format="jsonl"; shift ;;
+    --output)
+      (($# >= 2)) || { usage; exit 2; }
+      case "$2" in raw|value|id|json) output_mode=$2 ;; *)
+        printf 'kaname: invalid output mode: %s\n' "$2" >&2; exit 2 ;;
+      esac
+      shift 2 ;;
+    --applications) mode="applications"; shift ;;
+    --wallpaper) mode="wallpaper"; shift ;;
+    --images)
+      (($# >= 2)) || { usage; exit 2; }
+      images_file=$2; shift 2 ;;
+    --videos)
+      (($# >= 2)) || { usage; exit 2; }
+      videos_file=$2; shift 2 ;;
+    --menu)
+      (($# >= 2)) || { usage; exit 2; }
+      mode="menu"; menu_name=$2; shift 2 ;;
+    --prompt)
+      (($# >= 2)) || { usage; exit 2; }
+      prompt=$2; shift 2 ;;
+    --profile)
+      (($# >= 2)) || { usage; exit 2; }
+      profile=$2; shift 2 ;;
+    --screen)
+      (($# >= 2)) || { usage; exit 2; }
+      screen=$2; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'kaname: unknown option: %s\n' "$1" >&2; usage; exit 2 ;;
+  esac
+done
+
+[[ -n "$mode" ]] || { usage; exit 2; }
+
+qs_bin=${KANAME_QS_BIN:-quickshell}
+qml_dir=${KANAME_QML_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/quickshell"}
+
+ipc_call() {
+  "$qs_bin" ipc -p "$qml_dir" call kaname "$@" >/dev/null 2>&1 && return 0
+  [[ ${KANAME_NO_AUTOSTART:-0} == 1 ]] && return 1
+  "$qs_bin" -p "$qml_dir" --daemonize >/dev/null 2>&1 || true
+  for _ in $(seq 1 50); do
+    "$qs_bin" ipc -p "$qml_dir" call kaname "$@" >/dev/null 2>&1 && return 0
+    sleep 0.05
+  done
+  return 1
+}
+
+if [[ "$mode" == "applications" ]]; then
+  ipc_call showApplications "$screen" || { printf '%s\n' 'kaname: could not contact Quickshell' >&2; exit 3; }
+  exit 0
+elif [[ "$mode" == "menu" ]]; then
+  ipc_call showMenu "$menu_name" "$screen" || { printf '%s\n' 'kaname: could not contact Quickshell' >&2; exit 3; }
+  exit 0
+fi
+
+if [[ "$mode" == "wallpaper" ]]; then
+  [[ -n "$images_file" && -n "$videos_file" ]] || {
+    printf '%s\n' 'kaname: --wallpaper requires --images and --videos' >&2
+    exit 2
+  }
+  [[ -r "$images_file" && -r "$videos_file" ]] || {
+    printf '%s\n' 'kaname: wallpaper candidate file is not readable' >&2
+    exit 2
+  }
+  [[ -s "$images_file" || -s "$videos_file" ]] || {
+    printf '%s\n' 'kaname: no wallpaper candidates' >&2
+    exit 2
+  }
+fi
+
+runtime_root=${XDG_RUNTIME_DIR:-/tmp}
+request_root="$runtime_root/kaname-${UID}"
+umask 077
+mkdir -p "$request_root" || exit 2
+request_dir=$(mktemp -d "$request_root/request.XXXXXXXX") || exit 2
+request_id=${request_dir##*.}
+cleanup() {
+  "$qs_bin" ipc -p "$qml_dir" call kaname closeRequest "$request_id" >/dev/null 2>&1 || true
+  rm -rf -- "$request_dir"
+}
+trap cleanup EXIT HUP INT TERM
+
+candidates="$request_dir/candidates"
+prompt_file="$request_dir/prompt"
+result_file="$request_dir/result"
+printf '%s' "$prompt" >"$prompt_file"
+if [[ "$mode" == "wallpaper" ]]; then
+  candidates=""
+elif ! sed 's/\r$//' >"$candidates"; then
+  printf '%s\n' 'kaname: failed to read stdin' >&2
+  exit 2
+fi
+if [[ "$mode" != "wallpaper" ]]; then
+  [[ -s "$candidates" ]] || { printf '%s\n' 'kaname: no candidates' >&2; exit 2; }
+fi
+
+if [[ "$mode" == "wallpaper" ]]; then
+  ipc_call openWallpaperRequest "$request_id" "$images_file" "$videos_file" "$prompt_file" "$result_file" "$profile" "$output_mode" "$screen"
+else
+  ipc_call openRequest "$request_id" "$candidates" "$prompt_file" "$result_file" "$profile" "$input_format" "$output_mode" "$screen"
+fi || {
+  printf '%s\n' 'kaname: could not contact Quickshell' >&2
+  exit 3
+}
+
+timeout_ticks=${KANAME_TIMEOUT_TICKS:-0}
+if ! [[ "$timeout_ticks" =~ ^[0-9]+$ ]]; then
+  printf '%s\n' 'kaname: KANAME_TIMEOUT_TICKS must be a non-negative integer' >&2
+  exit 2
+fi
+
+# A launcher request is intentionally interactive and may remain open for far
+# longer than a minute. The former 6000 × 10ms default incorrectly reported a
+# healthy open UI as a Quickshell timeout. Keep waiting by default; callers
+# that need a bounded request can explicitly set KANAME_TIMEOUT_TICKS.
+wait_ticks=0
+probe_ticks=0
+while :; do
+  if [[ -f "$result_file" ]]; then
+    IFS= read -r status <"$result_file" || true
+    case "$status" in
+      selected)
+        tail -n +2 "$result_file"
+        exit 0 ;;
+      cancelled) exit 1 ;;
+      busy) printf '%s\n' 'kaname: launcher is busy' >&2; exit 3 ;;
+      error) tail -n +2 "$result_file" >&2; exit 2 ;;
+      *) printf 'kaname: invalid response for request %s\n' "$request_id" >&2; exit 3 ;;
+    esac
+  fi
+  if ((timeout_ticks > 0 && wait_ticks >= timeout_ticks)); then
+    printf '%s\n' 'kaname: timed out waiting for Quickshell' >&2
+    exit 3
+  fi
+
+  # The request itself has no default time limit. Still verify once per
+  # second that a Quickshell instance owns it; otherwise a crashed/reloaded
+  # shell leaves this blocking CLI with no possible result writer.
+  if ((probe_ticks >= 100)); then
+    probe_ticks=0
+    request_status=$(
+      "$qs_bin" ipc -p "$qml_dir" call kaname requestStatus "$request_id" 2>/dev/null
+    ) || {
+      printf '%s\n' 'kaname: Quickshell disappeared while waiting for the launcher response' >&2
+      exit 3
+    }
+    # Quickshell may decorate string return values depending on its version;
+    # accept either raw or quoted active/pending values.
+    case "$request_status" in
+      active|pending|'"active"'|'"pending"') ;;
+      *)
+        printf 'kaname: Quickshell no longer owns request %s (status: %s)\n' \
+          "$request_id" "${request_status:-missing}" >&2
+        exit 3 ;;
+    esac
+  fi
+  sleep 0.01
+  ((wait_ticks += 1))
+  ((probe_ticks += 1))
+done

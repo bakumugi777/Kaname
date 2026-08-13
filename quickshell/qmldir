@@ -1,0 +1,11 @@
+singleton Theme 1.0 Theme.qml
+singleton Config 1.0 Config.qml
+DmenuSource 1.0 DmenuSource.qml
+DesktopEntrySource 1.0 DesktopEntrySource.qml
+MenuSource 1.0 MenuSource.qml
+ProviderRunner 1.0 ProviderRunner.qml
+ParentRing 1.0 ParentRing.qml
+FanItem 1.0 FanItem.qml
+FanLayout 1.0 FanLayout.qml
+LauncherState 1.0 LauncherState.qml
+LauncherWindow 1.0 LauncherWindow.qml
