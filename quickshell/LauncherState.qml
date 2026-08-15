@@ -15,6 +15,10 @@ QtObject {
         return progress * progress * (3 - 2 * progress)
     }
     property string requestId: ""
+    // FileView atomic writes can finish just after respond() returns. Keep the
+    // request discoverable during that handoff so the CLI liveness probe does
+    // not mistake a completed request for a lost one.
+    property string completingRequestId: ""
     property string resultPath: ""
     property string prompt: ""
     property string profile: "default"
@@ -35,6 +39,7 @@ QtObject {
     property var navigationStack: []
     property bool providerAwaiting: false
     property bool parentTransferActive: false
+    property bool parentTransferHandoffActive: false
     property real parentTransferProgress: 0
     property bool parentExitActive: false
     property real parentExitProgress: 1
@@ -97,7 +102,49 @@ QtObject {
         return parsed
     }
 
+    function parseJsonCandidate(value, request, path, raw) {
+        if (!value || typeof value !== "object" || Array.isArray(value))
+            throw new Error(path + ": item must be an object")
+        const labelValue = value.label !== undefined ? value.label
+            : value.value !== undefined ? value.value : value.id
+        if (labelValue === undefined)
+            throw new Error(path + ": label, value, or id is required")
+        if (value.children !== undefined && !Array.isArray(value.children))
+            throw new Error(path + ".children: expected an array")
+
+        const children = []
+        if (Array.isArray(value.children)) {
+            for (let i = 0; i < value.children.length; ++i)
+                children.push(parseJsonCandidate(value.children[i], request,
+                                                  path + ".children[" + i + "]",
+                                                  JSON.stringify(value.children[i])))
+        }
+        const label = String(labelValue)
+        const itemRaw = raw !== undefined ? raw : JSON.stringify(value)
+        return {
+            id: value.id !== undefined ? String(value.id) : request + "-" + path,
+            type: value.children !== undefined ? "submenu" : String(value.type || ""),
+            value: value.value !== undefined ? String(value.value) : itemRaw,
+            raw: itemRaw,
+            json: value,
+            label: label,
+            description: value.description || "",
+            icon: value.icon || "",
+            image: value.image || "",
+            isImage: !!value.image,
+            key: value.key || "",
+            disabled: value.disabled === true,
+            children: children,
+            searchText: (label + " " + (value.description || "") + " "
+                + (value.image || "") + " " + (value.value || "") + " "
+                + (Array.isArray(value.keywords) ? value.keywords.join(" ") : "")).toLowerCase()
+        }
+    }
+
     function open(request, candidateText, promptText, responsePath, requestedProfile, inputFormat, requestedOutputMode, requestedScreen) {
+        parentTransferHandoffTimer.stop()
+        completionOwnershipTimer.stop()
+        completingRequestId = ""
         menuEntryTimer.stop()
         menuEntryPending = false
         childRevealActive = false
@@ -113,6 +160,7 @@ QtObject {
         parentReturnSettleActive = false
         pendingBack = null
         parentTransferActive = false
+        parentTransferHandoffActive = false
         parentTransferProgress = 0
         parentExitActive = false
         parentExitProgress = 1
@@ -135,32 +183,15 @@ QtObject {
             const raw = lines[i]
             if (inputFormat === "jsonl") {
                 let value
-                try { value = JSON.parse(raw) }
+                try {
+                    value = JSON.parse(raw)
+                    parsed.push(parseJsonCandidate(value, request, "line " + (i + 1), raw))
+                }
                 catch (failure) {
                     resultFile.path = resultPath
                     resultFile.setText("error\nline " + (i + 1) + ": " + failure + "\n")
                     return
                 }
-                const label = value.label || value.value || value.id
-                if (label === undefined) {
-                    resultFile.path = resultPath
-                    resultFile.setText("error\nline " + (i + 1) + ": label, value, or id is required\n")
-                    return
-                }
-                parsed.push({
-                    id: value.id !== undefined ? String(value.id) : request + "-" + i,
-                    value: value.value !== undefined ? String(value.value) : raw,
-                    raw: raw,
-                    json: value,
-                    label: String(label),
-                    description: value.description || "",
-                    icon: value.icon || "",
-                    image: value.image || "",
-                    isImage: !!value.image,
-                    key: value.key || "",
-                    disabled: value.disabled === true,
-                    searchText: (label + " " + (value.description || "") + " " + (value.image || "") + " " + (value.value || "") + " " + (Array.isArray(value.keywords) ? value.keywords.join(" ") : "")).toLowerCase()
-                })
             } else {
                 const simpleItems = parseLineCandidates(raw, request + "-" + i)
                 for (let simpleIndex = 0; simpleIndex < simpleItems.length; ++simpleIndex)
@@ -177,65 +208,8 @@ QtObject {
         show()
     }
 
-    function openWallpaper(request, imageText, videoText, promptText, responsePath, requestedProfile, requestedOutputMode, requestedScreen) {
-        menuEntryTimer.stop()
-        menuEntryPending = false
-        childRevealActive = false
-        childRevealProgress = 1
-        childDismissActive = false
-        childDismissProgress = 1
-        childLayerHidden = false
-        bandCollapseActive = false
-        bandCollapseProgress = 1
-        parentReturnActive = false
-        parentReturnProgress = 1
-        parentReturnHandoffActive = false
-        parentReturnSettleActive = false
-        pendingBack = null
-        parentTransferActive = false
-        parentTransferProgress = 0
-        parentExitActive = false
-        parentExitProgress = 1
-        ancestorEnterActive = false
-        ancestorEnterProgress = 1
-        ancestorEnterHandoffActive = false
-        pendingMenu = null
-        requestId = request
-        resultPath = responsePath
-        prompt = promptText || "Select Wallpaper"
-        profile = requestedProfile || "wallpaper"
-        screenName = requestedScreen || Config.defaultScreen
-        mode = "wallpaper"
-        outputMode = requestedOutputMode || "raw"
-        navigationStack = []
-        const imageItems = parseLineCandidates(imageText, request + "-image")
-        const videoItems = parseLineCandidates(videoText, request + "-video")
-        const roots = []
-        if (imageItems.length) roots.push({
-            id: "wallpaper-image", type: "submenu", label: "Image",
-            description: imageItems.length + " images", icon: "image-x-generic",
-            fallbackVisual: "image",
-            image: "", isImage: false, key: "i", children: imageItems,
-            searchText: "image wallpaper"
-        })
-        if (videoItems.length) roots.push({
-            id: "wallpaper-video", type: "submenu", label: "Video",
-            description: videoItems.length + " videos", icon: "video-x-generic",
-            fallbackVisual: "video",
-            image: "", isImage: false, key: "v", children: videoItems,
-            searchText: "video wallpaper"
-        })
-        allItems = roots
-        items = roots
-        selectedIndex = 0
-        rotationIndex = 0
-        scrollIndex = 0
-        query = ""
-        searchMode = false
-        show()
-    }
-
     function openItems(newMode, newPrompt, newItems, requestedScreen) {
+        parentTransferHandoffTimer.stop()
         menuEntryTimer.stop()
         menuEntryPending = false
         childRevealActive = false
@@ -251,6 +225,7 @@ QtObject {
         parentReturnSettleActive = false
         pendingBack = null
         parentTransferActive = false
+        parentTransferHandoffActive = false
         parentTransferProgress = 0
         parentExitActive = false
         parentExitProgress = 1
@@ -298,7 +273,7 @@ QtObject {
     }
 
     function enterMenu(newPrompt, newItems) {
-        if (parentTransferActive || menuEntryPending) return
+        if (parentTransferActive || parentTransferHandoffActive || menuEntryPending) return
         pendingMenu = {
             prompt: newPrompt,
             items: newItems,
@@ -347,7 +322,10 @@ QtObject {
         if (!parentTransferActive || !pendingMenu) return
         parentTransferActive = false
         parentTransferProgress = 1
-        pendingMenu = null
+        // Keep the completed transfer delegate visible while the persistent
+        // parent-ring delegate is created and its asynchronous icon resolves.
+        parentTransferHandoffActive = true
+        parentTransferHandoffTimer.restart()
     }
 
     function finishParentExit() {
@@ -446,7 +424,7 @@ QtObject {
     }
 
     function goBack() {
-        if (parentTransferActive || menuEntryPending || childRevealActive || childDismissActive || bandCollapseActive || parentReturnActive) return true
+        if (parentTransferActive || parentTransferHandoffActive || menuEntryPending || childRevealActive || childDismissActive || bandCollapseActive || parentReturnActive) return true
         if (searchMode) { endSearch(); return true }
         if (!navigationStack.length) return false
         pendingBack = navigationStack[navigationStack.length - 1]
@@ -468,7 +446,7 @@ QtObject {
     }
 
     function move(delta) {
-        if (parentTransferActive || menuEntryPending || childRevealActive || childDismissActive || bandCollapseActive || parentReturnActive) return
+        if (parentTransferActive || parentTransferHandoffActive || menuEntryPending || childRevealActive || childDismissActive || bandCollapseActive || parentReturnActive) return
         if (!items.length) return
         const nextIndex = (selectedIndex + delta + items.length) % items.length
         selectedIndex = nextIndex
@@ -507,19 +485,43 @@ QtObject {
     }
 
     function respond(status, value) {
-        if (!active) return
+        // The window remains active while its close animation runs. Repeated
+        // Escape/click input during that interval must not overwrite the
+        // completed request ownership with the already-cleared requestId.
+        if (!active || closing || !requestId) return
+        completingRequestId = requestId
         resultFile.path = resultPath
         resultFile.setText(status + "\n" + (value || ""))
         requestId = ""
+        completionOwnershipTimer.restart()
         beginClose()
     }
 
+    function releaseCompletedRequest(request) {
+        if (completingRequestId !== request) return
+        completionOwnershipTimer.stop()
+        completingRequestId = ""
+    }
+
+    function enterLevel() {
+        if (menuEntryPending || parentTransferActive || parentTransferHandoffActive || childRevealActive
+                || childDismissActive || bandCollapseActive || parentReturnActive)
+            return false
+        if (!items.length) return false
+        const item = items[selectedIndex]
+        if (!item || item.disabled) return false
+        if (item.type !== "submenu" && item.type !== "applications"
+                && item.type !== "provider") return false
+        accept()
+        return true
+    }
+
     function accept() {
-        if (menuEntryPending || parentTransferActive || childRevealActive || childDismissActive || bandCollapseActive || parentReturnActive) return
+        if (menuEntryPending || parentTransferActive || parentTransferHandoffActive || childRevealActive || childDismissActive || bandCollapseActive || parentReturnActive) return
         if (!items.length) return
         const item = items[selectedIndex]
         if (item.disabled) return
-        if (mode === "dmenu" || mode === "wallpaper") {
+        if (mode === "dmenu") {
             if (item.type === "submenu") { enterMenu(item.label, item.children); return }
             let output = item.raw !== undefined ? item.raw : item.value
             if (outputMode === "value") output = item.value
@@ -560,14 +562,16 @@ QtObject {
     }
 
     function focusFromPointer(index) {
-        if (parentTransferActive || menuEntryPending || childRevealActive || childDismissActive || bandCollapseActive || parentReturnActive) return
+        if (parentTransferActive || parentTransferHandoffActive || menuEntryPending || childRevealActive || childDismissActive || bandCollapseActive || parentReturnActive) return
         if (index < 0 || index >= items.length) return
         selectedIndex = index
     }
 
     function cancel() {
-        if (goBack()) return
-        if (mode === "dmenu" || mode === "wallpaper") respond("cancelled", "")
+        // Escape/background/IPC close always dismiss the whole launcher.
+        // Backspace calls goBack() directly for one-level navigation.
+        if (closing) return
+        if (mode === "dmenu") respond("cancelled", "")
         else beginClose()
     }
 
@@ -587,6 +591,21 @@ QtObject {
             root.presenting = false
             root.closing = false
             root.active = false
+        }
+    }
+
+    property Timer completionOwnershipTimer: Timer {
+        interval: 3000
+        repeat: false
+        onTriggered: root.completingRequestId = ""
+    }
+
+    property Timer parentTransferHandoffTimer: Timer {
+        interval: 96
+        repeat: false
+        onTriggered: {
+            root.parentTransferHandoffActive = false
+            root.pendingMenu = null
         }
     }
 

@@ -29,9 +29,35 @@ QtObject {
     property int themeAnimationMs: 350
     property bool reducedMotion: false
     property int cacheRadius: 1
+    property string enterLevelKey: "Left"
+    property string backLevelKey: "Right"
     property string themePreset: "matugen"
     property string defaultScreen: ""
     property var profiles: ({})
+    readonly property var defaultApplicationMenu: ({
+        title: "Applications",
+        description: "{count} applications",
+        categories: [
+            { id: "browser", label: "Browsers", icon: "web-browser", key: "b",
+                match: ["WebBrowser", "Network"] },
+            { id: "settings", label: "Settings", icon: "preferences-system", key: "s",
+                match: ["Settings", "System", "HardwareSettings"] },
+            { id: "media", label: "Media", icon: "applications-multimedia", key: "m",
+                children: [
+                    { id: "music", label: "Music", icon: "multimedia-player", key: "m",
+                        match: ["Audio", "Music"] },
+                    { id: "images", label: "Images", icon: "image-x-generic", key: "i",
+                        match: ["Graphics", "Photography", "2DGraphics", "RasterGraphics", "VectorGraphics"] },
+                    { id: "videos", label: "Videos", icon: "video-x-generic", key: "v",
+                        match: ["Video", "VideoEditing", "TV"] }
+                ] },
+            { id: "tools", label: "Tools", icon: "applications-utilities", key: "t",
+                match: ["Utility", "Development", "FileManager", "TerminalEmulator", "TextEditor", "Archiving"] }
+        ],
+        fallback: { id: "other", label: "Other", icon: "applications-other", key: "o" },
+        all: { id: "all", label: "All Applications", icon: "view-app-grid-symbolic", key: "a" }
+    })
+    property var applicationMenu: defaultApplicationMenu
 
     function number(value, fallback, minimum, maximum) {
         return typeof value === "number" && isFinite(value) ? Math.max(minimum, Math.min(maximum, value)) : fallback
@@ -44,6 +70,33 @@ QtObject {
 
     function motionDuration(value) { return reducedMotion ? 0 : value }
 
+    function keyCode(name) {
+        switch (String(name || "").toLowerCase()) {
+        case "left": return Qt.Key_Left
+        case "right": return Qt.Key_Right
+        case "up": return Qt.Key_Up
+        case "down": return Qt.Key_Down
+        case "backspace": return Qt.Key_Backspace
+        case "return": return Qt.Key_Return
+        case "enter": return Qt.Key_Enter
+        case "escape": return Qt.Key_Escape
+        case "space": return Qt.Key_Space
+        case "tab": return Qt.Key_Tab
+        default: return 0
+        }
+    }
+
+    function keyBinding(value, fallback) {
+        if (typeof value !== "string") return fallback
+        return value.toLowerCase() === "none" || keyCode(value) !== 0 ? value : fallback
+    }
+
+    function matchesKey(key, binding) {
+        if (String(binding || "").toLowerCase() === "none") return false
+        const configured = keyCode(binding)
+        return configured !== 0 && key === configured
+    }
+
     function applyConfig() {
         try {
             const value = JSON.parse(configFile.text())
@@ -51,6 +104,7 @@ QtObject {
             const g = value.geometry || {}
             const o = value.opacity || {}
             const b = value.behavior || {}
+            const keys = b.keyBindings || {}
             const t = value.theme || {}
             const d = value.display || {}
             windowWidth = number(g.width, windowWidth, 320, 4096)
@@ -76,9 +130,13 @@ QtObject {
             themeAnimationMs = Math.round(number(b.themeAnimationMs, themeAnimationMs, 0, 5000))
             reducedMotion = b.reducedMotion === true
             cacheRadius = Math.round(number(b.cacheRadius, cacheRadius, 0, 5))
+            enterLevelKey = keyBinding(keys.enterLevel, enterLevelKey)
+            backLevelKey = keyBinding(keys.backLevel, backLevelKey)
             themePreset = typeof t.preset === "string" ? t.preset : themePreset
             defaultScreen = typeof d.screen === "string" ? d.screen : defaultScreen
             profiles = value.profiles && typeof value.profiles === "object" ? value.profiles : ({})
+            applicationMenu = value.applications && typeof value.applications === "object"
+                ? value.applications : defaultApplicationMenu
         } catch (error) {
             console.warn("kaname: keeping last valid config:", error)
         }

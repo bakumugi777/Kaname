@@ -194,7 +194,12 @@ Item {
             centerY: startY + (endY - startY) * progress
         }
     }
-    visible: state.navigationStack.length > 0 || state.parentTransferActive || state.parentReturnHandoffActive
+    visible: state.navigationStack.length > 0 || state.parentTransferActive
+        || state.parentTransferHandoffActive || state.parentReturnHandoffActive
+    // Parent and snapshot delegates do not use FanLayout's opening geometry.
+    // Fade their common layer with the same content envelope so a whole-stack
+    // Escape cannot leave inner-ring cards behind while the fan closes.
+    opacity: state.openingContentProgress
 
     NumberAnimation {
         target: root.state
@@ -301,7 +306,8 @@ Item {
     }
 
     Repeater {
-        model: root.state.parentTransferActive && root.transferLevel
+        model: (root.state.parentTransferActive || root.state.parentTransferHandoffActive)
+            && root.transferLevel
             ? Math.min(7, root.transferLevel.items.length) : 0
         delegate: FanItem {
             required property int index
@@ -332,6 +338,7 @@ Item {
                 : Math.min(root.capturedOuterItemWidth, root.capturedOuterItemHeight)
             modelData: root.transferLevel.items[index]
             selected: index === transferIndex
+            forceSelectionGlow: selected
             circular: true
             animateSelection: false
             animateOpacity: false
@@ -381,6 +388,19 @@ Item {
                 ? returnStartCenterX + (returnCenterX - returnStartCenterX) * returnProgress : ringCenterX
             readonly property real centerY: returning
                 ? returnStartCenterY + (returnCenterY - returnStartCenterY) * returnProgress : ringCenterY
+            // Whole-stack close mirrors FanLayout's angular collapse. Start
+            // exactly at the live parent-ring position, then converge every
+            // retained parent card onto the fan's center ray.
+            readonly property real closingCenterX: root.width + root.centerOffsetX
+                + Math.cos(root.outerSelectedAngle * Math.PI / 180) * root.radius
+            readonly property real closingCenterY: root.height + root.centerOffsetY
+                + Math.sin(root.outerSelectedAngle * Math.PI / 180) * root.radius
+            readonly property real presentedCenterX: root.state.closing
+                ? closingCenterX + (centerX - closingCenterX) * root.state.openingProgress
+                : centerX
+            readonly property real presentedCenterY: root.state.closing
+                ? closingCenterY + (centerY - closingCenterY) * root.state.openingProgress
+                : centerY
             readonly property real targetWidth: selected ? root.targetItemSize : 88
             readonly property real targetHeight: selected ? root.targetItemSize : 88
             // The return endpoint must be the exact base size of FanLayout.
@@ -394,6 +414,7 @@ Item {
                 ? targetHeight + (returnBaseHeight - targetHeight) * returnProgress : targetHeight
             modelData: root.displayItems[index]
             selected: index === root.displaySelectedParent
+            forceSelectionGlow: selected
             circular: true
             animateSelection: false
             // ParentRing changes model/selection while returning. Its visual
@@ -401,13 +422,15 @@ Item {
             // implicit opacity or focus fades here cause a visible flicker.
             animateOpacity: false
             animateFocus: false
-            shown: true
+            // Construct and preload this persistent delegate underneath the
+            // completed transfer snapshot, then expose it in one handoff.
+            shown: !root.state.parentTransferHandoffActive
             reveal: root.state.presenting ? 1 : 0
             cacheActive: true
             width: baseWidth
             height: baseHeight
-            x: centerX - width / 2
-            y: centerY - height / 2
+            x: presentedCenterX - width / 2
+            y: presentedCenterY - height / 2
             // Keep the terminal return snapshot above freshly-created
             // FanLayout delegates until the handoff timer releases it. The
             // previous ordering let the two nearly-identical item layers
@@ -415,7 +438,7 @@ Item {
             z: (root.state.parentReturnActive || root.state.parentReturnHandoffActive)
                 ? (selected ? 12 : 11) : (selected ? 9 : 3)
             onChosen: root.state.goBack()
-            onScrolled: delta => root.state.move(delta > 0 ? -1 : 1)
+            onScrolled: delta => root.state.move(delta > 0 ? 1 : -1)
         }
     }
 }

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_file=$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")
+install_root=$(CDPATH='' cd -- "$(dirname -- "$script_file")/.." && pwd)
+qs_bin=${KANAME_QS_BIN:-quickshell}
+
+exec "$qs_bin" -p "$install_root/quickshell" "$@"

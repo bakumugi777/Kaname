@@ -26,7 +26,14 @@
                 --set KANAME_QML_DIR $out/share/kaname/quickshell \
                 --prefix QT_PLUGIN_PATH : ${pkgs.qt6.qtimageformats}/lib/qt-6/plugins \
                 --prefix PATH : ${nixpkgs.lib.makeBinPath [ pkgs.coreutils pkgs.quickshell ]}
+              makeWrapper ${pkgs.quickshell}/bin/quickshell $out/bin/kaname-shell \
+                --add-flags "-p $out/share/kaname/quickshell" \
+                --prefix QT_PLUGIN_PATH : ${pkgs.qt6.qtimageformats}/lib/qt-6/plugins
             '';
+            meta = {
+              mainProgram = "kaname";
+              license = pkgs.lib.licenses.mit;
+            };
           };
         in {
           default = app;

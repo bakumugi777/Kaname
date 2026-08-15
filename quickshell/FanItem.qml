@@ -13,10 +13,16 @@ Item {
     property bool animateSelection: true
     property bool animateOpacity: true
     property bool animateFocus: true
+    property real selectionGlowPulse: 0.45
+    property real selectionGlowPresence: 0
+    // Snapshot/parent-ring delegates suppress focus animations to avoid
+    // handoff flicker, but may still need to preserve the selected glow.
+    property bool forceSelectionGlow: false
+    readonly property real effectiveSelectionGlowPresence: forceSelectionGlow
+        && selected ? 1 : selectionGlowPresence
     property real entranceScale: 1
     property real exitScale: 1
     readonly property var safeData: modelData || ({ label: "", image: "", isImage: false })
-    readonly property string fallbackVisual: safeData.fallbackVisual || ""
     readonly property string fallbackIconName: {
         switch (safeData.type) {
         case "submenu": return "folder"
@@ -50,12 +56,54 @@ Item {
     property real itemOpacity: 0.92
     property real inactiveOpacity: Config.inactiveOpacity
     property real imageOpacity: Config.imageOpacity
-    readonly property real cardOpacity: selected ? itemOpacity : inactiveOpacity
+    // Selection is communicated by the border/glow, not by brightening the
+    // whole translucent card surface.
+    readonly property real cardOpacity: inactiveOpacity
+    readonly property color brightBorderColor: Qt.lighter(Theme.primary, 1.36)
     signal chosen()
     signal scrolled(real delta)
     signal focusRequested()
 
-    onSelectedChanged: wallpaperTypeIcon.requestPaint()
+    onSelectedChanged: {
+        glowIn.stop()
+        glowOut.stop()
+        if (Config.reducedMotion) {
+            selectionGlowPresence = selected ? 1 : 0
+        } else if (!animateFocus) {
+            // Parent-return handoffs suppress delegate animations. Keep the
+            // glow dark until that handoff ends, then start the normal reveal.
+            selectionGlowPresence = 0
+        } else if (selected) {
+            glowIn.restart()
+        } else {
+            glowOut.restart()
+        }
+    }
+    onForceSelectionGlowChanged: {
+        // Hand the fully lit snapshot glow back to the normal delegate
+        // without restarting its fade-in from zero.
+        if (!forceSelectionGlow && selected)
+            selectionGlowPresence = 1
+    }
+    onAnimateFocusChanged: {
+        if (!animateFocus) {
+            glowIn.stop()
+            glowOut.stop()
+            selectionGlowPresence = 0
+        } else if (selected && !Config.reducedMotion
+                   && !forceSelectionGlow && selectionGlowPresence < 0.999) {
+            glowIn.stop()
+            selectionGlowPresence = 0
+            glowIn.restart()
+        }
+    }
+    Component.onCompleted: {
+        selectionGlowPresence = 0
+        if (selected) {
+            if (Config.reducedMotion) selectionGlowPresence = 1
+            else if (animateFocus) glowIn.restart()
+        }
+    }
 
     scale: (selected ? 1.16 : 0.88) * entranceScale * exitScale
     // Dimming an entire delegate also dims its icon. Keep the icon, thumbnail,
@@ -70,35 +118,103 @@ Item {
         enabled: root.animateOpacity
         NumberAnimation { duration: Config.motionDuration(Config.animationMs) }
     }
+    NumberAnimation {
+        id: glowIn
+        target: root
+        property: "selectionGlowPresence"
+        to: 1
+        duration: Config.motionDuration(Math.max(480, Config.animationMs * 2.7))
+        easing.type: Easing.InOutCubic
+    }
+    NumberAnimation {
+        id: glowOut
+        target: root
+        property: "selectionGlowPresence"
+        to: 0
+        duration: Config.motionDuration(140)
+        easing.type: Easing.OutQuad
+    }
+    SequentialAnimation on selectionGlowPulse {
+        running: root.selected && root.shown
+            && root.effectiveSelectionGlowPresence > 0.001 && !Config.reducedMotion
+        loops: Animation.Infinite
+        NumberAnimation {
+            from: 0.12; to: 1
+            duration: 620
+            easing.type: Easing.InOutSine
+        }
+        NumberAnimation {
+            from: 1; to: 0.12
+            duration: 1350
+            easing.type: Easing.InOutSine
+        }
+    }
+
+    // Closely stacked translucent surfaces form a cheap outward glow. The
+    // opaque card drawn above hides their centres, leaving only a soft falloff
+    // around the selected contour.
+    Item {
+        anchors.fill: parent
+        z: -1
+        visible: root.effectiveSelectionGlowPresence > 0.001
+        opacity: root.effectiveSelectionGlowPresence
+            * (0.48 + root.selectionGlowPulse * 0.52)
+
+        Rectangle {
+            anchors.fill: parent; anchors.margins: -13
+            radius: root.circular ? width / 2 : 31
+            color: "transparent"
+            border.width: 13
+            border.color: Qt.rgba(Theme.tertiary.r, Theme.tertiary.g, Theme.tertiary.b, 0.05)
+            transform: Translate { x: 1.5; y: -1 }
+        }
+        Rectangle {
+            anchors.fill: parent; anchors.margins: -10
+            radius: root.circular ? width / 2 : 28
+            color: "transparent"
+            border.width: 10
+            border.color: Qt.rgba(Theme.tertiary.r, Theme.tertiary.g, Theme.tertiary.b, 0.065)
+            transform: Translate { x: 1; y: -0.5 }
+        }
+        Rectangle {
+            anchors.fill: parent; anchors.margins: -7
+            radius: root.circular ? width / 2 : 25
+            color: "transparent"
+            border.width: 7
+            border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.085)
+        }
+        Rectangle {
+            anchors.fill: parent; anchors.margins: -4
+            radius: root.circular ? width / 2 : 22
+            color: "transparent"
+            border.width: 4
+            border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.12)
+        }
+        Rectangle {
+            anchors.fill: parent; anchors.margins: -2
+            radius: root.circular ? width / 2 : 20
+            color: "transparent"
+            border.width: 2
+            border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.17)
+        }
+    }
 
     Rectangle {
         anchors.fill: parent
         radius: root.circular ? width / 2 : 18
-        // Keep each item distinct from the fan while allowing the wallpaper
-        // to show through. Darkening the generated surface avoids washed-out
-        // cards on bright matugen palettes.
-        color: Qt.rgba(Theme.surfaceContainer.r * 0.72,
-                       Theme.surfaceContainer.g * 0.72,
-                       Theme.surfaceContainer.b * 0.72,
-                       0.38 * root.cardOpacity)
-        border.color: root.selected
-            ? Theme.primary
-            : Qt.rgba(Theme.outline.r, Theme.outline.g, Theme.outline.b, root.cardOpacity)
-        border.width: root.selected ? 3 : 1
-
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: -7
-            radius: root.circular ? width / 2 : 23
-            color: "transparent"
-            border.color: Theme.primary
-            border.width: root.selected ? 2 : 0
-            opacity: root.selected ? 0.55 : 0
-            Behavior on opacity {
-                enabled: root.animateFocus
-                NumberAnimation { duration: Config.motionDuration(Config.animationMs) }
-            }
-        }
+        // A stable dark matugen underlay separates every card from the brighter
+        // holographic fan. Selection still belongs exclusively to the border
+        // glow, so the interior does not flash when focus changes.
+        color: Qt.rgba(Theme.controlSurface.r,
+                       Theme.controlSurface.g,
+                       Theme.controlSurface.b,
+                       Math.max(0.42, Math.min(0.58, root.cardOpacity)))
+        border.color: Qt.rgba(
+            Theme.secondary.r + (root.brightBorderColor.r - Theme.secondary.r) * root.effectiveSelectionGlowPresence,
+            Theme.secondary.g + (root.brightBorderColor.g - Theme.secondary.g) * root.effectiveSelectionGlowPresence,
+            Theme.secondary.b + (root.brightBorderColor.b - Theme.secondary.b) * root.effectiveSelectionGlowPresence,
+            root.cardOpacity + (1 - root.cardOpacity) * root.effectiveSelectionGlowPresence)
+        border.width: 1 + 2 * root.effectiveSelectionGlowPresence
 
         // A permanent secondary ring marks items that open another level.
         // It is intentionally distinct from the stronger selection halo.
@@ -110,7 +226,10 @@ Item {
             color: "transparent"
             border.color: Theme.primary
             border.width: 1
-            opacity: root.selected ? 0.9 : 0.48
+            // Root application categories are all submenus. A fully bright
+            // hierarchy marker covered the selected glow there, so let the
+            // selection border remain visually dominant.
+            opacity: 0.48 - root.effectiveSelectionGlowPresence * 0.06
         }
 
         Image {
@@ -136,51 +255,9 @@ Item {
             fillMode: Image.PreserveAspectFit
         }
 
-        Canvas {
-            id: wallpaperTypeIcon
-            width: 44
-            height: 44
-            anchors.centerIn: parent
-            visible: !root.safeData.isImage && root.iconSource.length === 0
-                && root.fallbackVisual.length > 0
-            onPaint: {
-                const ctx = getContext("2d")
-                ctx.clearRect(0, 0, width, height)
-                ctx.strokeStyle = Theme.text
-                ctx.fillStyle = ctx.strokeStyle
-                ctx.lineWidth = 3
-                ctx.lineJoin = "round"
-
-                if (root.fallbackVisual === "image") {
-                    ctx.strokeRect(3, 6, 38, 31)
-                    ctx.beginPath()
-                    ctx.moveTo(7, 33)
-                    ctx.lineTo(18, 21)
-                    ctx.lineTo(25, 27)
-                    ctx.lineTo(31, 19)
-                    ctx.lineTo(39, 33)
-                    ctx.stroke()
-                    ctx.beginPath()
-                    ctx.arc(14, 14, 3, 0, Math.PI * 2)
-                    ctx.fill()
-                } else {
-                    ctx.strokeRect(3, 9, 38, 26)
-                    ctx.beginPath()
-                    ctx.moveTo(20, 15)
-                    ctx.lineTo(20, 29)
-                    ctx.lineTo(32, 22)
-                    ctx.closePath()
-                    ctx.fill()
-                }
-            }
-            onVisibleChanged: requestPaint()
-            Component.onCompleted: requestPaint()
-        }
-
         Text {
             anchors.centerIn: parent
             visible: !root.safeData.isImage && root.iconSource.length === 0
-                && root.fallbackVisual.length === 0
             text: "⚙"
             // The gear is an intentional fallback, not a selected-label
             // inversion. Keep it legible against the translucent card.
@@ -203,6 +280,41 @@ Item {
             maximumLineCount: 1
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
+        }
+
+        // A narrow inward falloff drawn above thumbnails and card contents.
+        // Only the first ten pixels inside the contour receive light; the
+        // centre of the item remains exactly at its normal color.
+        Item {
+            anchors.fill: parent
+            visible: root.effectiveSelectionGlowPresence > 0.001
+            opacity: root.effectiveSelectionGlowPresence
+                * (0.48 + root.selectionGlowPulse * 0.52)
+
+            Rectangle {
+                anchors.fill: parent
+                radius: root.circular ? width / 2 : 18
+                color: "transparent"
+                border.width: 10
+                border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.05)
+                antialiasing: true
+            }
+            Rectangle {
+                anchors.fill: parent
+                radius: root.circular ? width / 2 : 18
+                color: "transparent"
+                border.width: 6
+                border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08)
+                antialiasing: true
+            }
+            Rectangle {
+                anchors.fill: parent
+                radius: root.circular ? width / 2 : 18
+                color: "transparent"
+                border.width: 3
+                border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.14)
+                antialiasing: true
+            }
         }
 
         Rectangle {

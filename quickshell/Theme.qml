@@ -16,6 +16,13 @@ QtObject {
     property color text: "#e2e2e9"
     property color textMuted: "#c5c6d0"
     property color error: "#ffb4ab"
+    // A dark, visibly themed control surface. Keep primary out of this mix so
+    // the primary-coloured selection glow retains clear colour contrast.
+    readonly property color controlSurface: Qt.rgba(
+        background.r * 0.58 + surface.r * 0.26 + secondary.r * 0.10 + tertiary.r * 0.06,
+        background.g * 0.58 + surface.g * 0.26 + secondary.g * 0.10 + tertiary.g * 0.06,
+        background.b * 0.58 + surface.b * 0.26 + secondary.b * 0.10 + tertiary.b * 0.06,
+        1)
     property int transitionMs: Config.motionDuration(Config.themeAnimationMs)
 
     function applyPreset() {

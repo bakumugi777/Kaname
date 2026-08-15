@@ -5,7 +5,6 @@ import Quickshell.Io
 QtObject {
     id: root
     property string path: Quickshell.env("KANAME_MENUS_FILE") || (Quickshell.env("HOME") + "/.config/kaname/menus.json")
-    property string defaultPath: Quickshell.env("KANAME_DEFAULT_MENUS_FILE") || Quickshell.shellPath("../config/menus.json")
     property var menus: ({})
     property string error: ""
     signal changed()
@@ -66,6 +65,23 @@ QtObject {
         }
     }
 
+    function loadBuiltin() {
+        const items = [
+            normalize({ id: "applications", type: "applications", label: "Applications",
+                description: "XDG applications", icon: "view-app-grid-symbolic", key: "a" }, "main", 0),
+            normalize({ id: "tools", type: "submenu", label: "Tools", icon: "folder", key: "t",
+                children: [{ id: "terminal", type: "command", label: "Terminal",
+                    description: "Configured terminal example", icon: "utilities-terminal",
+                    key: "t", command: ["foot"] }] }, "main", 1),
+            normalize({ id: "provider-example", type: "provider", label: "Dynamic example",
+                description: "Candidates produced by an external process", icon: "view-refresh",
+                key: "d", command: ["printf", "Alpha\nBeta\nGamma\n"], inputFormat: "lines" }, "main", 2)
+        ]
+        menus = ({ main: { label: "Kaname", items: items } })
+        error = ""
+        changed()
+    }
+
     function menu(name) { return menus[name] }
 
     property FileView file: FileView {
@@ -76,11 +92,7 @@ QtObject {
         onFileChanged: reload()
     }
 
-    property FileView defaultFile: FileView {
-        path: root.defaultPath
-        preload: true
-        onLoaded: {
-            if (Object.keys(root.menus).length === 0) root.loadText(text())
-        }
+    Component.onCompleted: {
+        if (Object.keys(root.menus).length === 0) root.loadBuiltin()
     }
 }

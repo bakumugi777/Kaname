@@ -28,7 +28,11 @@
     "animationMs": 180,
     "themeAnimationMs": 350,
     "reducedMotion": false,
-    "cacheRadius": 1
+    "cacheRadius": 1,
+    "keyBindings": {
+      "enterLevel": "Left",
+      "backLevel": "Right"
+    }
   },
   "theme": {
     "preset": "matugen"
@@ -36,15 +40,80 @@
   "display": {
     "screen": ""
   },
+  "applications": {
+    "title": "Applications",
+    "description": "{count} applications",
+    "categories": [
+      {
+        "id": "browser",
+        "label": "Browsers",
+        "icon": "web-browser",
+        "key": "b",
+        "match": ["WebBrowser", "Network"]
+      },
+      {
+        "id": "settings",
+        "label": "Settings",
+        "icon": "preferences-system",
+        "key": "s",
+        "match": ["Settings", "System", "HardwareSettings"]
+      },
+      {
+        "id": "media",
+        "label": "Media",
+        "icon": "applications-multimedia",
+        "key": "m",
+        "children": [
+          {
+            "id": "music",
+            "label": "Music",
+            "icon": "multimedia-player",
+            "key": "m",
+            "match": ["Audio", "Music"]
+          },
+          {
+            "id": "images",
+            "label": "Images",
+            "icon": "image-x-generic",
+            "key": "i",
+            "match": ["Graphics", "Photography", "2DGraphics", "RasterGraphics", "VectorGraphics"]
+          },
+          {
+            "id": "videos",
+            "label": "Videos",
+            "icon": "video-x-generic",
+            "key": "v",
+            "match": ["Video", "VideoEditing", "TV"]
+          }
+        ]
+      },
+      {
+        "id": "tools",
+        "label": "Tools",
+        "icon": "applications-utilities",
+        "key": "t",
+        "match": ["Utility", "Development", "FileManager", "TerminalEmulator", "TextEditor", "Archiving"]
+      }
+    ],
+    "fallback": {
+      "id": "other",
+      "label": "Other",
+      "icon": "applications-other",
+      "key": "o"
+    },
+    "all": {
+      "id": "all",
+      "label": "All Applications",
+      "icon": "view-app-grid-symbolic",
+      "key": "a"
+    }
+  },
   "profiles": {
     "applications": {
       "geometry": { "visibleItems": 7, "itemWidth": 150, "itemHeight": 104 }
     },
-    "wallpaper-image": {
+    "preview": {
       "geometry": { "visibleItems": 5, "itemWidth": 220, "itemHeight": 140, "radius": 820 }
-    },
-    "wallpaper-video": {
-      "geometry": { "visibleItems": 5, "itemWidth": 210, "itemHeight": 132, "radius": 800 }
     },
     "compact": {
       "geometry": { "visibleItems": 5, "itemWidth": 124, "itemHeight": 88 }

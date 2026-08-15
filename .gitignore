@@ -1,22 +1,37 @@
-  # Crash dumps
-  core
-  core.*
+# Crash dumps
+/core
+/core.*
 
-  # Verification/reference media
-  検証用/
-  参考用/
-  右下に広がる要ランチャー.png
+# Local verification and reference material
+/検証用/
+/参考用/
+/右下に広がる要ランチャー.png
 
-  # Local agent metadata
-  .agents/
-  .codex/
+# Personal integration scripts and notes (not part of Kaname itself)
+/連携スクリプト/
+/起動.txt
 
-  # Runtime/cache files
-  *.log
-  *.pid
-  .cache/
-  result
-  result-*
+# Local AI/agent metadata
+/.agents/
+/.codex/
 
-  連携スクリプト
-  起動.txt
+# Nix and development environments
+/result
+/result-*
+/.direnv/
+/.envrc
+
+# Runtime and cache files
+/.cache/
+*.log
+*.pid
+*.qmlc
+*.jsc
+
+# Editor and operating-system files
+/.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+.DS_Store

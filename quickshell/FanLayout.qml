@@ -20,7 +20,17 @@ Item {
     property real configuredEndAngle: Config.profileValue(state.profile, "geometry", "endAngle", Config.endAngle)
     property real centerOffsetX: Config.profileValue(state.profile, "geometry", "centerOffsetX", Config.centerOffsetX)
     property real centerOffsetY: Config.profileValue(state.profile, "geometry", "centerOffsetY", Config.centerOffsetY)
-    readonly property bool menuRoot: (state.mode === "menu" || state.mode === "wallpaper") && state.navigationStack.length === 0
+    readonly property bool hierarchicalRoot: {
+        if (state.navigationStack.length !== 0) return false
+        for (let i = 0; i < state.items.length; ++i) {
+            if (state.items[i] && state.items[i].type === "submenu") return true
+        }
+        return false
+    }
+    // Root category choosers use compact circular geometry regardless of who
+    // supplied the hierarchy. Leaf-only dmenu input keeps its selected profile.
+    readonly property bool menuRoot: state.navigationStack.length === 0
+        && (state.mode === "menu" || state.mode === "applications" || hierarchicalRoot)
     property real configuredItemWidth: Config.profileValue(state.profile, "geometry", "itemWidth", Config.itemWidth)
     property real configuredItemHeight: Config.profileValue(state.profile, "geometry", "itemHeight", Config.itemHeight)
     readonly property real itemWidth: menuRoot ? 104 : configuredItemWidth
@@ -36,9 +46,18 @@ Item {
     readonly property real effectiveSpan: Math.max(75, configuredSpan)
     readonly property real startAngle: configuredCenterAngle - effectiveSpan / 2
     readonly property real endAngle: configuredCenterAngle + effectiveSpan / 2
-    readonly property real angleStep: effectiveSpan / Math.max(1, visibleCount - 1)
+    readonly property bool compactSixRoot: menuRoot && state.items.length === 6
+    // Six fixed entries are centred on half-slots (-2.5 ... +2.5). Using the
+    // normal seven-slot step pushes the lower endpoint too close to 180° and
+    // clips that card at the bottom edge. Give six entries one extra virtual
+    // interval so they stay centred but fit inside the same fan. Every motion
+    // path and captured return geometry consumes this single angleStep value.
+    readonly property real angleStep: compactSixRoot
+        ? effectiveSpan / Math.max(1, visibleCount)
+        : effectiveSpan / Math.max(1, visibleCount - 1)
     readonly property real minimumChord: Math.max(itemWidth * 1.08, itemHeight * 1.35)
-    readonly property real requiredRadius: angleStep > 0 ? minimumChord / (2 * Math.sin(angleStep * Math.PI / 360)) : configuredRadius
+    readonly property real requiredRadius: compactSixRoot ? 540
+        : angleStep > 0 ? minimumChord / (2 * Math.sin(angleStep * Math.PI / 360)) : configuredRadius
     readonly property real radius: Math.max(menuRoot ? 540 : 760, menuRoot ? 540 : configuredRadius, requiredRadius)
     readonly property real selectedAngle: (startAngle + endAngle) / 2
     // Do not let the temporary setItems(…)->saved selection restoration at
@@ -156,6 +175,10 @@ Item {
 
             modelData: root.state.items[index]
             selected: index === root.state.selectedIndex
+            // During a parent-return handoff this delegate is underneath the
+            // snapshot layer. Keep both fully lit so releasing the snapshot
+            // cannot expose a dark frame.
+            forceSelectionGlow: selected && root.returningToParent
             // The return snapshot owns the final 80ms handoff. Rendering the
             // newly-created translucent card underneath it composites the two
             // surfaces and makes root items flash darker before settling.
@@ -187,8 +210,8 @@ Item {
             imageOpacity: root.imageOpacity
             // Commands, folders, and plain dmenu entries share the circular
             // launcher language. Actual img: / image candidates stay as
-            // rectangular thumbnail cards so wallpaper previews retain their
-            // current aspect and readability.
+            // rectangular thumbnail cards so previews retain their aspect and
+            // readability.
             circular: !modelData.isImage
             // Circular items have a fixed square footprint. Labels never
             // affect geometry; only real image candidates use the configured
@@ -201,7 +224,7 @@ Item {
             rotation: circular ? 0 : boundedAngle - root.selectedAngle
 
             onChosen: { root.state.selectedIndex = index; root.state.accept() }
-            onScrolled: delta => root.state.move(delta > 0 ? -1 : 1)
+            onScrolled: delta => root.state.move(delta > 0 ? 1 : -1)
             onFocusRequested: root.state.focusFromPointer(index)
 
             Behavior on animatedOffset {

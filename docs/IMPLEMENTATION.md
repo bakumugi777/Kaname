@@ -1,4 +1,4 @@
-# Kaname Phase 0–1 design
+# Kaname implementation notes
 
 ## Fixed runtime
 
@@ -11,7 +11,7 @@ the pre-1.0 IPC and layer-shell APIs can change.
 
 `LauncherWindow.qml` is a transparent `PanelWindow`, anchored right and bottom,
 with no exclusive zone. It requests the overlay layer and exclusive keyboard
-focus while visible. Its finite 760×620 surface avoids covering the whole output;
+focus while visible. Its finite surface avoids covering the whole output;
 transparent areas inside that surface cancel on click.
 
 `kaname` creates a mode-0700 request directory under `$XDG_RUNTIME_DIR`, writes
@@ -23,7 +23,8 @@ misrouting.
 
 ## Components
 
-- `shell.qml`: composition and IPC endpoint
+- `shell.qml`: minimal standalone `ShellRoot` entry point
+- `Kaname.qml`: embeddable `Scope`, composition, and IPC endpoint
 - `LauncherState.qml`: request, filtering, selection, and response lifecycle
 - `DmenuSource.qml`: request-owned input files
 - `LauncherWindow.qml`: layer-shell window and input routing
@@ -31,7 +32,13 @@ misrouting.
 - `Theme.qml`: last-known-good semantic palette and watched JSON
 - `config/default.json`: adjustable geometry, opacity, and animation trial values
 
-The initial UI values are seven items, radius 760, and angles 195–270 degrees.
+`Kaname.qml` can be imported into another Quickshell configuration as a local
+directory module. The standalone entry point instantiates the same component,
+so embedded and standalone operation do not maintain separate implementations.
+The CLI selects the owning Quickshell configuration with `KANAME_QML_DIR`; an
+embedded host must point this variable at the shared shell path.
+
+The initial UI values are seven items, radius 760, and angles 180–270 degrees.
 Delegates are clamped to an eight-pixel safe area so experimental geometry cannot
 place an actionable item beyond the layer surface.
 
@@ -69,12 +76,14 @@ the startup fallback.
 
 ## Phase 3
 
-Structured dmenu requests use JSON Lines and preserve each original line while
-separating semantic display fields. The response can select `raw`, `value`,
-`id`, or normalized JSON. Invalid lines return status `error`, exit code 2, and
-stderr only. Provider menu items launch argument arrays through `Process`,
+Structured dmenu requests use JSON Lines and preserve each original top-level
+line while separating semantic display fields. A recursive `children` array
+uses the same item schema and supplies arbitrary-depth navigation without any
+domain-specific launcher mode. The response can select `raw`, `value`, `id`,
+or normalized JSON. Invalid items return status `error`, exit code 2, and stderr
+only. Provider menu items launch argument arrays through `Process`,
 collect stdout/stderr through `StdioCollector`, and parse after EOF. Loading,
-empty, and failure states remain navigable so Escape can restore the parent.
+empty, and failure states remain navigable so Backspace can restore the parent.
 Incremental streaming is intentionally deferred.
 
 ## Phase 4

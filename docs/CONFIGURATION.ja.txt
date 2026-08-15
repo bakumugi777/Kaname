@@ -34,6 +34,12 @@ Quickshellの再起動なしで反映されます。JSONが壊れている場合
   KANAME_CONFIG_FILE   config.json
   KANAME_MENUS_FILE    menus.json
   KANAME_THEME_FILE    生成済みテーマJSON
+  KANAME_QML_DIR       kaname CLIが接続するQuickshell設定ディレクトリ
+
+KANAME_QML_DIRは通常変更不要です。Kanameを共通Quickshellへ組み込む場合だけ、
+共有シェルのshell.qmlがあるディレクトリを指定します。
+
+  KANAME_QML_DIR="$HOME/.config/quickshell/shared" kaname --applications
 
 
 2. JSON記述上の注意
@@ -65,7 +71,7 @@ Quickshellの再起動なしで反映されます。JSONが壊れている場合
       "centerOffsetX": -100,
       "centerOffsetY": 30,
       "radius": 760,
-      "startAngle": 195,
+      "startAngle": 180,
       "endAngle": 270,
       "visibleItems": 7,
       "itemWidth": 150,
@@ -111,8 +117,8 @@ Quickshellの再起動なしで反映されます。JSONが壊れている場合
       760以上か、項目寸法から求めた必要半径の大きい方が使われます。
 
   startAngle / endAngle
-      扇の角度（度）。現在の右下配置では195～270程度が基準です。表示範囲は
-      最低75度に補正されます。
+      扇の角度（度）。同梱設定は180～270です。表示範囲は最低75度に
+      補正されます。
 
   visibleItems
       同時表示数。1～15。通常は奇数（5または7）が中央配置に向いています。
@@ -127,7 +133,7 @@ Quickshellの再起動なしで反映されます。JSONが壊れている場合
   item         通常項目
   inactive     非選択項目
   guide        円弧ガイド線
-  fan          黒い扇背景
+  fan          扇背景
   text         中央テキスト
   image        サムネイル
 
@@ -149,6 +155,17 @@ backgroundとoverlayはスキーマ互換用に残っています。現在の「
   cacheRadius
       表示範囲の外側で先読みする項目数。0～5。画像は非同期縮小デコードされ、
       Qtのメモリキャッシュを利用します。
+
+  keyBindings.enterLevel
+      選択項目の子階層へ進むキー。既定値は"Left"。葉項目は実行しません。
+
+  keyBindings.backLevel
+      親階層へ戻るキー。既定値は"Right"。
+
+指定可能なキー名はLeft、Right、Up、Down、Backspace、Return、Enter、Escape、
+Space、Tabです。"None"を指定すると、その操作の追加キーを無効化します。
+同じキーを複数操作へ割り当てないでください。Backspaceの階層戻り、Enterの
+確定、Escapeの全終了は従来どおり利用できます。
 
 closeOnFocusLossは将来互換用の予約キーです。現在はフォーカス喪失で閉じません。
 
@@ -201,7 +218,75 @@ image、fanを現在上書きできます。
   find ~/.wallpapers/image -type f | sed 's|^|img:|' |
     ./bin/kaname --dmenu --profile my-wallpaper
 
-同梱プロファイルはapplications、wallpaper-image、wallpaper-video、compactです。
+同梱プロファイルはapplications、preview、compactです。
+
+
+3.7 applications
+
+--applicationsの根階層に表示する分類、順序、アイコンを設定します。
+
+  "applications": {
+    "title": "Applications",
+    "description": "{count} applications",
+    "categories": [
+      {
+        "id": "browser",
+        "label": "Browsers",
+        "icon": "web-browser",
+        "key": "b",
+        "match": ["WebBrowser", "Network"]
+      },
+      {
+        "id": "settings",
+        "label": "Settings",
+        "icon": "preferences-system",
+        "key": "s",
+        "match": ["Settings", "System", "HardwareSettings"]
+      },
+      {
+        "id": "media",
+        "label": "Media",
+        "icon": "applications-multimedia",
+        "key": "m",
+        "children": [
+          { "id": "music", "label": "Music", "icon": "multimedia-player",
+            "key": "m", "match": ["Audio", "Music"] },
+          { "id": "images", "label": "Images", "icon": "image-x-generic",
+            "key": "i", "match": ["Graphics", "Photography"] },
+          { "id": "videos", "label": "Videos", "icon": "video-x-generic",
+            "key": "v", "match": ["Video", "VideoEditing", "TV"] }
+        ]
+      }
+    ],
+    "fallback": {
+      "id": "other",
+      "label": "Other",
+      "icon": "applications-other",
+      "key": "o"
+    },
+    "all": {
+      "id": "all",
+      "label": "All Applications",
+      "icon": "view-app-grid-symbolic",
+      "key": "a"
+    }
+  }
+
+titleは根階層の見出しです。descriptionは各分類の説明で、{count}が件数に
+置換されます。categoriesは上から順に評価され、最初に一致した分類だけへ入ります。matchには
+desktop entryのCategories値（WebBrowser、Settings、Audioなど）を書きます。
+iconには現在のシステムアイコンテーマで利用できるアイコン名を指定します。
+childrenには同じ分類形式を入れ子にでき、親分類には子分類とそのアプリが表示されます。
+分類判定は末端のmatchに対して、設定に書かれた順序で行われます。
+
+どのmatchにも一致しないアプリはfallbackへ入ります。全アプリはallにも表示され、
+allが有効な場合は根階層の先頭項目として初期フォーカスされます。
+fallbackまたはallへ "enabled": false を追加すると、その項目を非表示にできます。
+categoriesの配列順が根階層での表示順になります。設定変更は次回
+--applicationsを開いたときに反映されます。
+
+同梱の初期設定は公開利用を想定して英語表記です。label、title、descriptionを
+日本語や漢字へ変更しても分類処理には影響しません。
 
 
 4. menus.json
@@ -238,7 +323,8 @@ image、fanを現在上書きできます。
   disabled        trueなら選択不能
   workingDirectory コマンドの作業ディレクトリ
 
-keyは現在の階層だけで有効です。Escapeまたは通常時のBackspaceで親へ戻ります。
+keyは現在の階層だけで有効です。Backspaceで親へ戻ります。Escapeは検索中なら
+検索を解除し、通常時は現在の階層に関係なくランチャー全体を閉じます。
 
 
 4.2 applications
@@ -325,16 +411,20 @@ providerが返すJSON Lines例:
 
   printf '%s\n' \
     '{"id":"one","label":"One","value":"1","keywords":["first"]}' \
-    '{"id":"two","label":"Two","value":"2","image":"/tmp/two.webp"}' |
+    '{"id":"media","label":"Media","icon":"folder","children":[{"label":"Two","value":"2","image":"/tmp/two.webp"}]}' |
     ./bin/kaname --jsonl --output value --prompt Structured
 
 利用可能なフィールド:
 
-  id, label, description, icon, image, value, keywords, key, disabled
+  id, label, description, icon, image, value, keywords, key, disabled, children
+
+childrenは同じ項目形式の配列で、任意の深さにネストできます。childrenを持つ項目は
+自動的にサブメニューになります。iconにはテーマアイコン名、絶対パス、file: URLを
+指定できます。
 
 --output:
 
-  raw     入力された元のJSON行（既定）
+  raw     最上位は入力された元のJSON行、子項目はその項目のJSON（既定）
   value   value
   id      id
   json    Kanameが保持するJSONオブジェクト
@@ -354,6 +444,58 @@ providerが返すJSON Lines例:
 色は"#RRGGBB"形式です。透明度はテーマJSONではなくconfig.jsonで管理します。
 壊れたテーマへ更新された場合、Kanameは直前の有効テーマを維持します。
 
+matugenテンプレートは次の場所へ配置します。
+
+  ~/.config/kaname/kaname-colors.json.template
+
+リポジトリ同梱版を使う場合:
+
+  mkdir -p ~/.config/kaname
+  cp matugen/kaname-colors.json.template \
+    ~/.config/kaname/kaname-colors.json.template
+
+完全なテンプレート例:
+
+  {
+    "schemaVersion": 1,
+    "background": "{{colors.background.default.hex}}",
+    "surface": "{{colors.surface.default.hex}}",
+    "surfaceContainer": "{{colors.surface_container.default.hex}}",
+    "primary": "{{colors.primary.default.hex}}",
+    "secondary": "{{colors.secondary.default.hex}}",
+    "tertiary": "{{colors.tertiary.default.hex}}",
+    "outline": "{{colors.outline.default.hex}}",
+    "text": "{{colors.on_background.default.hex}}",
+    "textMuted": "{{colors.on_surface_variant.default.hex}}",
+    "error": "{{colors.error.default.hex}}"
+  }
+
+最小構成ではschemaVersion、background、primary、textだけでも動作します。
+省略した色には、Kanameが現在保持している色または内蔵色が使われます。
+
+  {
+    "schemaVersion": 1,
+    "background": "{{colors.background.default.hex}}",
+    "primary": "{{colors.primary.default.hex}}",
+    "text": "{{colors.on_background.default.hex}}"
+  }
+
+連携用apply-wallpaper.shは、このテンプレートをmatugenへ渡し、生成結果を次へ
+アトミックに配置します。
+
+  ~/.cache/matugen/kaname-colors.json
+
+Kanameは生成先を監視しているため、正常なJSONへ置き換わるとQuickshellを再起動せず
+色を更新します。テンプレートまたは生成先を変更する場合は、それぞれ次の環境変数を
+使用します。
+
+  KANAME_TEMPLATE=/path/to/template.json
+  KANAME_THEME_FILE=/path/to/generated-colors.json
+
+KANAME_THEME_FILEはapply-wallpaper.shと、Kanameを起動するQuickshellプロセスの
+両方へ同じ値を渡してください。テンプレートが存在しない場合は新しいKaname用JSONを
+生成せず、既存JSONがあればその色を維持し、なければKaname内蔵色を使用します。
+
 
 7. 優先順位とトラブルシューティング
 -------------------------------------
@@ -365,7 +507,14 @@ providerが返すJSON Lines例:
 設定を反映できない場合:
 
   1. jq emptyでJSONを検査する
-  2. quickshell log -p /home/shin/Desktop/dev/kaname/quickshell -t 100
+  2. 開発ツリーでは次のコマンドでログを確認する
+
+     quickshell log -p "$PWD/quickshell" -t 100
+
+     Nixパッケージではkaname-shellを起動しているsystemdユーザーサービスの
+     journalも確認する
+
+     journalctl --user -u kaname.service -b
   3. 必要ならQuickshellを再起動する
 
   quickshell kill -p "$PWD/quickshell"

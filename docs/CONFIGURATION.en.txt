@@ -34,6 +34,13 @@ The locations can be overridden with:
   KANAME_CONFIG_FILE   Path to config.json
   KANAME_MENUS_FILE    Path to menus.json
   KANAME_THEME_FILE    Path to the generated theme JSON
+  KANAME_QML_DIR       Quickshell configuration directory used by the CLI
+
+KANAME_QML_DIR normally needs no override. When Kaname is embedded in a shared
+Quickshell configuration, set it to the directory containing the shared
+shell.qml:
+
+  KANAME_QML_DIR="$HOME/.config/quickshell/shared" kaname --applications
 
 
 2. JSON rules
@@ -65,7 +72,7 @@ Complete example:
       "centerOffsetX": -100,
       "centerOffsetY": 30,
       "radius": 760,
-      "startAngle": 195,
+      "startAngle": 180,
       "endAngle": 270,
       "visibleItems": 7,
       "itemWidth": 150,
@@ -112,8 +119,8 @@ Complete example:
       overlap.
 
   startAngle / endAngle
-      Fan angles in degrees. About 195-270 is the baseline for bottom-right
-      placement. The rendered span is at least 75 degrees.
+      Fan angles in degrees. The bundled configuration uses 180-270. The
+      rendered span is at least 75 degrees.
 
   visibleItems
       Number of simultaneous items, from 1 to 15. Odd values such as 5 or 7
@@ -129,7 +136,7 @@ Complete example:
   item         Normal items
   inactive     Unselected items
   guide        Circular guide line
-  fan          Black fan surface
+  fan          Fan surface
   text         Center text
   image        Thumbnails
 
@@ -152,6 +159,18 @@ have no visible effect.
   cacheRadius
       Number of off-arc items to prefetch, from 0 to 5. Images are decoded
       asynchronously at a reduced size and use Qt's in-memory cache.
+
+  keyBindings.enterLevel
+      Key that enters the selected child level. Default: "Left". It does not
+      activate leaf items.
+
+  keyBindings.backLevel
+      Key that returns to the parent level. Default: "Right".
+
+Supported names are Left, Right, Up, Down, Backspace, Return, Enter, Escape,
+Space, and Tab. Use "None" to disable an additional hierarchy binding. Do not
+assign one key to multiple operations. Backspace still returns one level,
+Enter activates, and Escape closes the whole launcher.
 
 closeOnFocusLoss is reserved for future compatibility. Focus loss does not
 currently close Kaname.
@@ -205,8 +224,74 @@ Use a profile with:
   find ~/.wallpapers/image -type f | sed 's|^|img:|' |
     ./bin/kaname --dmenu --profile my-wallpaper
 
-Bundled profiles are applications, wallpaper-image, wallpaper-video, and
-compact.
+Bundled profiles are applications, preview, and compact.
+
+
+3.7 applications
+
+Configures the categories, order, and icons shown at the root of
+--applications.
+
+  "applications": {
+    "title": "Applications",
+    "description": "{count} applications",
+    "categories": [
+      {
+        "id": "browser",
+        "label": "Browsers",
+        "icon": "web-browser",
+        "key": "b",
+        "match": ["WebBrowser", "Network"]
+      },
+      {
+        "id": "settings",
+        "label": "Settings",
+        "icon": "preferences-system",
+        "key": "s",
+        "match": ["Settings", "System", "HardwareSettings"]
+      },
+      {
+        "id": "media",
+        "label": "Media",
+        "icon": "applications-multimedia",
+        "key": "m",
+        "children": [
+          { "id": "music", "label": "Music", "icon": "multimedia-player",
+            "key": "m", "match": ["Audio", "Music"] },
+          { "id": "images", "label": "Images", "icon": "image-x-generic",
+            "key": "i", "match": ["Graphics", "Photography"] },
+          { "id": "videos", "label": "Videos", "icon": "video-x-generic",
+            "key": "v", "match": ["Video", "VideoEditing", "TV"] }
+        ]
+      }
+    ],
+    "fallback": {
+      "id": "other",
+      "label": "Other",
+      "icon": "applications-other",
+      "key": "o"
+    },
+    "all": {
+      "id": "all",
+      "label": "All applications",
+      "icon": "view-app-grid-symbolic",
+      "key": "a"
+    }
+  }
+
+title is the root heading. description is used for each category and replaces
+{count} with its application count. Categories are tested in array order and the first match wins. match contains
+freedesktop desktop-entry Categories values such as WebBrowser, Settings, and
+Audio. icon is an icon name supplied by the active system icon theme.
+children may recursively contain the same category format. A parent category
+shows its child categories and their applications. Classification tests leaf
+match arrays in configuration order.
+
+Applications which match no category are placed in fallback. all contains
+every application and, when enabled, is the first and initially focused root
+entry. Add "enabled": false to fallback or all to hide that entry.
+The categories array also controls root-menu order. Changes apply the next time
+--applications is opened.
 
 
 4. menus.json
@@ -243,8 +328,9 @@ Open it with:
   disabled         true prevents activation
   workingDirectory Working directory for a command
 
-Bindings are local to the current level. Escape or Backspace outside search
-returns to the parent.
+Bindings are local to the current level. Backspace outside search returns to
+the parent. Escape leaves search first; otherwise it closes the whole launcher
+regardless of the current depth.
 
 
 4.2 applications
@@ -332,16 +418,20 @@ Example JSON Lines from a provider:
 
   printf '%s\n' \
     '{"id":"one","label":"One","value":"1","keywords":["first"]}' \
-    '{"id":"two","label":"Two","value":"2","image":"/tmp/two.webp"}' |
+    '{"id":"media","label":"Media","icon":"folder","children":[{"label":"Two","value":"2","image":"/tmp/two.webp"}]}' |
     ./bin/kaname --jsonl --output value --prompt Structured
 
 Available fields:
 
-  id, label, description, icon, image, value, keywords, key, disabled
+  id, label, description, icon, image, value, keywords, key, disabled, children
+
+children is an array using the same item schema and may be nested to any depth.
+An item with children automatically becomes a submenu. icon accepts a theme icon
+name, an absolute path, or a file: URL.
 
 --output modes:
 
-  raw     Exact original JSON line (default)
+  raw     Original top-level line, or the selected child item's JSON (default)
   value   value
   id      id
   json    JSON object retained by Kaname
@@ -361,6 +451,60 @@ optional, but the supplied template generates:
 Colors use "#RRGGBB". Opacity belongs in config.json, not in the theme file.
 Kaname retains the last valid palette when a broken theme update is detected.
 
+Install the matugen template at:
+
+  ~/.config/kaname/kaname-colors.json.template
+
+To use the copy supplied by this repository:
+
+  mkdir -p ~/.config/kaname
+  cp matugen/kaname-colors.json.template \
+    ~/.config/kaname/kaname-colors.json.template
+
+Complete template example:
+
+  {
+    "schemaVersion": 1,
+    "background": "{{colors.background.default.hex}}",
+    "surface": "{{colors.surface.default.hex}}",
+    "surfaceContainer": "{{colors.surface_container.default.hex}}",
+    "primary": "{{colors.primary.default.hex}}",
+    "secondary": "{{colors.secondary.default.hex}}",
+    "tertiary": "{{colors.tertiary.default.hex}}",
+    "outline": "{{colors.outline.default.hex}}",
+    "text": "{{colors.on_background.default.hex}}",
+    "textMuted": "{{colors.on_surface_variant.default.hex}}",
+    "error": "{{colors.error.default.hex}}"
+  }
+
+The minimum valid form only needs schemaVersion, background, primary, and text.
+Omitted colors retain the values currently held by Kaname or its built-in
+defaults.
+
+  {
+    "schemaVersion": 1,
+    "background": "{{colors.background.default.hex}}",
+    "primary": "{{colors.primary.default.hex}}",
+    "text": "{{colors.on_background.default.hex}}"
+  }
+
+The integration apply-wallpaper.sh passes this template to matugen and
+atomically installs the generated result at:
+
+  ~/.cache/matugen/kaname-colors.json
+
+Kaname watches that destination and updates its colors without restarting
+Quickshell when a valid JSON file replaces it. Override the template and output
+paths with:
+
+  KANAME_TEMPLATE=/path/to/template.json
+  KANAME_THEME_FILE=/path/to/generated-colors.json
+
+Pass the same KANAME_THEME_FILE value to apply-wallpaper.sh and to the
+Quickshell process running Kaname. If the template is absent, no new Kaname JSON
+is generated. An existing JSON keeps its previous colors; with no JSON, Kaname
+uses its built-in palette.
+
 
 7. Precedence and troubleshooting
 ---------------------------------
@@ -372,8 +516,11 @@ Value precedence:
 If a change is not applied:
 
   1. Validate JSON with jq empty.
-  2. Inspect logs:
-     quickshell log -p /home/shin/Desktop/dev/kaname/quickshell -t 100
+  2. Inspect logs in a development checkout:
+     quickshell log -p "$PWD/quickshell" -t 100
+
+     For the packaged user service, inspect its journal:
+     journalctl --user -u kaname.service -b
   3. Restart Quickshell if needed:
 
      quickshell kill -p "$PWD/quickshell"
