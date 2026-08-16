@@ -71,6 +71,7 @@ QtObject {
     signal commandRequested(var command, string workingDirectory)
     signal applicationsRequested()
     signal providerRequested(var item)
+    signal desktopApplicationLaunched(string desktopId)
     signal parentTransferStarting()
     signal parentReturnStarting(var geometry)
     signal parentExitStarting()
@@ -289,8 +290,24 @@ QtObject {
         // Called immediately before the current level is pushed. Keeping this
         // with the stack entry lets a deep return restore the actual target
         // level, rather than whichever level was most recently animated.
-        if (pendingMenu && pendingMenu.previous && geometry)
+        if (pendingMenu && pendingMenu.previous && geometry) {
+            // Large parent sets keep their spatial order. Only rotate far
+            // enough to move a clipped edge selection into the fully-visible
+            // safe range (-2 ... +2), and retain that adjusted ordering on
+            // return. This is a real one-slot scroll rather than a recentering
+            // model replacement.
+            const count = pendingMenu.previous.items.length
+            if (count >= 7) {
+                const sourceRotation = geometry.rotationIndex
+                const selected = pendingMenu.previous.selectedIndex
+                let offset = (selected - sourceRotation) % count
+                if (offset > count / 2) offset -= count
+                if (offset < -count / 2) offset += count
+                if (offset > 2) geometry.rotationIndex = sourceRotation + offset - 2
+                else if (offset < -2) geometry.rotationIndex = sourceRotation + offset + 2
+            }
             pendingMenu.previous.geometry = geometry
+        }
     }
 
     function startParentTransfer() {
@@ -391,7 +408,10 @@ QtObject {
         prompt = previous.prompt
         setItems(previous.items)
         selectedIndex = Math.min(previous.selectedIndex, Math.max(0, items.length - 1))
-        rotationIndex = items.length > 6 ? selectedIndex : 0
+        rotationIndex = items.length > 6
+            ? previous.geometry && previous.geometry.rotationIndex !== undefined
+                ? previous.geometry.rotationIndex : selectedIndex
+            : 0
         childLayerHidden = false
         pendingBack = null
         parentReturnHandoffTimer.restart()
@@ -534,6 +554,7 @@ QtObject {
         if (item.type === "applications") { applicationsRequested(); return }
         if (item.type === "provider") { beginProvider(item); return }
         if (item.type === "desktop" && item.desktopEntry) {
+            desktopApplicationLaunched(item.value || item.desktopEntry.id || "")
             item.desktopEntry.execute()
             beginClose()
             return

@@ -35,6 +35,8 @@ Quickshellの再起動なしで反映されます。JSONが壊れている場合
   KANAME_MENUS_FILE    menus.json
   KANAME_THEME_FILE    生成済みテーマJSON
   KANAME_QML_DIR       kaname CLIが接続するQuickshell設定ディレクトリ
+  KANAME_APPLICATION_HISTORY_FILE
+                       最近使ったアプリの履歴JSON
 
 KANAME_QML_DIRは通常変更不要です。Kanameを共通Quickshellへ組み込む場合だけ、
 共有シェルのshell.qmlがあるディレクトリを指定します。
@@ -68,8 +70,8 @@ KANAME_QML_DIRは通常変更不要です。Kanameを共通Quickshellへ組み�
     "geometry": {
       "width": 1100,
       "height": 900,
-      "centerOffsetX": -100,
-      "centerOffsetY": 30,
+      "centerOffsetX": 0,
+      "centerOffsetY": 0,
       "radius": 760,
       "startAngle": 180,
       "endAngle": 270,
@@ -258,6 +260,13 @@ image、fanを現在上書きできます。
         ]
       }
     ],
+    "recent": {
+      "id": "recent",
+      "label": "Recently Used",
+      "icon": "document-open-recent",
+      "key": "r",
+      "limit": 10
+    },
     "fallback": {
       "id": "other",
       "label": "Other",
@@ -287,6 +296,41 @@ categoriesの配列順が根階層での表示順になります。設定変更�
 
 同梱の初期設定は公開利用を想定して英語表記です。label、title、descriptionを
 日本語や漢字へ変更しても分類処理には影響しません。
+
+
+3.8 最近使ったアプリ
+
+Kanameから起動したDesktop Entryを、重複なしの新しい順で表示します。同梱設定は
+直近10件です。ほかのランチャー、Niriのキーバインド、ターミナルなどから起動した
+アプリは記録されません。
+
+  "recent": {
+    "id": "recent",
+    "label": "Recently Used",
+    "icon": "document-open-recent",
+    "key": "r",
+    "limit": 10
+  }
+
+  enabled   falseならRecently Usedを非表示
+  id        内部ID
+  label     根階層に表示する名前
+  icon      システムアイコンテーマのアイコン名
+  key       根階層内のショートカット
+  limit     表示・保存件数。1～100。既定値10
+
+履歴の保存先:
+
+  $XDG_STATE_HOME/kaname/application-usage.json
+
+XDG_STATE_HOMEが未設定なら次を使います。
+
+  ~/.local/state/kaname/application-usage.json
+
+保存先はKANAME_APPLICATION_HISTORY_FILEで変更できます。履歴を初期化する場合は、
+Kanameを所有するQuickshellを終了してから履歴ファイルを削除してください。存在しない
+Desktop EntryはRecently Usedから自動的に除外して表示します。履歴ファイルの破損や
+欠落があっても、アプリランチャーのほかの分類は引き続き利用できます。
 
 
 4. menus.json

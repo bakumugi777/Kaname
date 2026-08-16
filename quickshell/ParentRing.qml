@@ -6,8 +6,10 @@ Item {
     property real radius: 545
     property real centerOffsetX: Config.centerOffsetX
     property real centerOffsetY: Config.centerOffsetY
-    property real startAngle: 202
-    property real endAngle: 263
+    // LauncherWindow binds these to FanLayout so the retained parent level
+    // occupies the same complete fan span as the root level.
+    property real startAngle: 180
+    property real endAngle: 270
     readonly property real targetItemSize: 116
     property real outerRadius: 760
     property real outerCenterOffsetX: Config.centerOffsetX
@@ -28,10 +30,13 @@ Item {
     property var capturedOuterItemPositions: []
     property var returnHandoffItems: []
     property int returnHandoffSelectedIndex: -1
+    property int returnHandoffRotationIndex: 0
     property var exitItems: []
     property int exitSelectedIndex: -1
+    property int exitRotationIndex: 0
     property var ancestorEnterItems: []
     property int ancestorEnterSelectedIndex: -1
+    property int ancestorEnterRotationIndex: 0
     property var transferSourcePositions: []
     property var returnSourcePositions: []
 
@@ -87,9 +92,118 @@ Item {
         return offset
     }
 
+    function itemIndexForSlot(slot, count, rotationIndex) {
+        if (count < 7) return slot
+        return ((rotationIndex + slot - 3) % count + count) % count
+    }
+
+    function slotForItemIndex(index, count, rotationIndex) {
+        if (count < 7) return index
+        let offset = (index - rotationIndex) % count
+        if (offset > count / 2) offset -= count
+        if (offset < -count / 2) offset += count
+        return offset + 3
+    }
+
+    function transferEntries(count, sourceRotationIndex, destinationRotationIndex) {
+        const entries = []
+        if (count < 7) {
+            for (let index = 0; index < count; ++index)
+                entries.push({ itemIndex: index, sourceVisible: true, destinationVisible: true, wrapRole: "" })
+            return entries
+        }
+        const rotationDelta = destinationRotationIndex - sourceRotationIndex
+        if (count === 7 && Math.abs(rotationDelta) === 1) {
+            const wrappingSlot = rotationDelta < 0 ? 6 : 0
+            let wrappingIndex = -1
+            for (let slot = 0; slot < 7; ++slot) {
+                const itemIndex = itemIndexForSlot(slot, count, sourceRotationIndex)
+                if (slot === wrappingSlot) {
+                    wrappingIndex = itemIndex
+                    entries.push({ itemIndex: itemIndex, sourceVisible: true,
+                        destinationVisible: false, wrapRole: "out" })
+                } else {
+                    entries.push({ itemIndex: itemIndex, sourceVisible: true,
+                        destinationVisible: true, wrapRole: "" })
+                }
+            }
+            entries.push({ itemIndex: wrappingIndex, sourceVisible: false,
+                destinationVisible: true, wrapRole: "in" })
+            return entries
+        }
+        for (let slot = 0; slot < 7; ++slot) {
+            entries.push({ itemIndex: itemIndexForSlot(slot, count, sourceRotationIndex),
+                sourceVisible: true, destinationVisible: false, wrapRole: "" })
+        }
+        for (let slot = 0; slot < 7; ++slot) {
+            const index = itemIndexForSlot(slot, count, destinationRotationIndex)
+            let found = false
+            for (let entry = 0; entry < entries.length; ++entry) {
+                if (entries[entry].itemIndex === index) {
+                    entries[entry].destinationVisible = true
+                    found = true
+                    break
+                }
+            }
+            if (!found) entries.push({ itemIndex: index, sourceVisible: false,
+                destinationVisible: true, wrapRole: "" })
+        }
+        return entries
+    }
+
+    function minimallyVisibleRotation(sourceRotationIndex, selectedIndex, count) {
+        if (count < 7) return sourceRotationIndex
+        let offset = (selectedIndex - sourceRotationIndex) % count
+        if (offset > count / 2) offset -= count
+        if (offset < -count / 2) offset += count
+        if (offset > 2) return sourceRotationIndex + offset - 2
+        if (offset < -2) return sourceRotationIndex + offset + 2
+        return sourceRotationIndex
+    }
+
+    // One placement model covers every parent count. Small sets retain their
+    // array order but use only the centred portion of the band. Large sets
+    // expose the selected item and its three circular neighbours on each side.
+    // Physical card sizes are included so the visible gaps remain even.
+    function innerAngle(index, count, rotationIndex, selectedIndex) {
+        if (count <= 1) return (startAngle + endAngle) / 2
+        const visibleCount = Math.min(7, count)
+        const slot = slotForItemIndex(index, count, rotationIndex)
+        const selectedSlot = slotForItemIndex(selectedIndex, count, rotationIndex)
+        const span = endAngle - startAngle
+        const fullArcLength = Math.abs(span) * Math.PI / 180 * radius
+        const usedArcLength = fullArcLength * (visibleCount - 1) / 6
+        const normalSize = 88
+        let occupiedIntervals = 0
+        for (let interval = 0; interval < visibleCount - 1; ++interval) {
+            const leftSize = interval === selectedSlot ? targetItemSize : normalSize
+            const rightSize = interval + 1 === selectedSlot ? targetItemSize : normalSize
+            occupiedIntervals += (leftSize + rightSize) / 2
+        }
+        const gap = Math.max(0, (usedArcLength - occupiedIntervals)
+            / Math.max(1, visibleCount - 1))
+        let distance = (fullArcLength - usedArcLength) / 2
+        if (slot >= 0) {
+            for (let interval = 0; interval < slot; ++interval) {
+                const leftSize = interval === selectedSlot ? targetItemSize : normalSize
+                const rightSize = interval + 1 === selectedSlot ? targetItemSize : normalSize
+                distance += (leftSize + rightSize) / 2 + gap
+            }
+        } else {
+            for (let interval = -1; interval >= slot; --interval) {
+                const leftSize = interval === selectedSlot ? targetItemSize : normalSize
+                const rightSize = interval + 1 === selectedSlot ? targetItemSize : normalSize
+                distance -= (leftSize + rightSize) / 2 + gap
+            }
+        }
+        return startAngle + (span < 0 ? -1 : 1)
+            * distance / radius * 180 / Math.PI
+    }
+
     function captureReturnHandoff() {
         returnHandoffItems = levelItems
         returnHandoffSelectedIndex = selectedParent
+        returnHandoffRotationIndex = levelRotationIndex
     }
 
     function captureReturnOrigin() {
@@ -97,7 +211,7 @@ Item {
         for (let i = 0; i < parentRepeater.count; ++i) {
             const item = parentRepeater.itemAt(i)
             if (!item) continue
-            positions[i] = { centerX: item.x + item.width / 2, centerY: item.y + item.height / 2,
+            positions[item.itemIndex] = { centerX: item.x + item.width / 2, centerY: item.y + item.height / 2,
                 width: item.width, height: item.height }
         }
         returnSourcePositions = positions
@@ -108,13 +222,16 @@ Item {
     // start position is already stale as soon as the parent begins moving.
     function selectedReturnCenter() {
         const index = displaySelectedParent
-        const item = index >= 0 ? parentRepeater.itemAt(index) : null
+        const slot = index >= 0
+            ? slotForItemIndex(index, displayItems.length, displayRotationIndex) : -1
+        const item = slot >= 0 ? parentRepeater.itemAt(slot) : null
         return item ? { centerX: item.x + item.width / 2, centerY: item.y + item.height / 2 } : null
     }
 
     function captureExitLayer() {
         exitItems = levelItems
         exitSelectedIndex = selectedParent
+        exitRotationIndex = levelRotationIndex
     }
 
     function captureAncestorEnterLayer() {
@@ -122,26 +239,52 @@ Item {
         const ancestor = ancestorIndex >= 0 ? state.navigationStack[ancestorIndex] : null
         ancestorEnterItems = ancestor ? ancestor.items : []
         ancestorEnterSelectedIndex = ancestor ? ancestor.selectedIndex : -1
+        ancestorEnterRotationIndex = ancestor && ancestor.geometry
+            && ancestor.geometry.rotationIndex !== undefined
+            ? ancestor.geometry.rotationIndex : ancestorEnterSelectedIndex
     }
 
 
     readonly property var level: state.navigationStack.length ? state.navigationStack[state.navigationStack.length - 1] : null
     readonly property var levelItems: level ? level.items : []
     readonly property int selectedParent: level ? level.selectedIndex : -1
+    // The stack stores the minimally adjusted outer rotation: clipped edge
+    // selections move just inside the fan while already-visible selections
+    // keep their place.
+    readonly property int levelRotationIndex: level && level.geometry
+        && level.geometry.rotationIndex !== undefined
+        ? level.geometry.rotationIndex : selectedParent
     // Pre-create the ancestor cards while a deep level is open. This avoids
     // delegate/image creation work on the first frame of a deep-level back.
     readonly property var preparedAncestor: state.navigationStack.length > 1
         ? state.navigationStack[state.navigationStack.length - 2] : null
     readonly property var preparedAncestorItems: preparedAncestor ? preparedAncestor.items : []
     readonly property int preparedAncestorSelectedIndex: preparedAncestor ? preparedAncestor.selectedIndex : -1
+    readonly property int preparedAncestorRotationIndex: preparedAncestor && preparedAncestor.geometry
+        && preparedAncestor.geometry.rotationIndex !== undefined
+        ? preparedAncestor.geometry.rotationIndex : preparedAncestorSelectedIndex
     readonly property var ancestorDisplayItems: state.ancestorEnterHandoffActive
         ? ancestorEnterItems : preparedAncestorItems
     readonly property int ancestorDisplaySelectedIndex: state.ancestorEnterHandoffActive
         ? ancestorEnterSelectedIndex : preparedAncestorSelectedIndex
+    readonly property int ancestorDisplayRotationIndex: state.ancestorEnterHandoffActive
+        ? ancestorEnterRotationIndex : preparedAncestorRotationIndex
     readonly property var displayItems: state.parentReturnHandoffActive ? returnHandoffItems : levelItems
     readonly property int displaySelectedParent: state.parentReturnHandoffActive
         ? returnHandoffSelectedIndex : selectedParent
+    readonly property int displayRotationIndex: state.parentReturnHandoffActive
+        ? returnHandoffRotationIndex : levelRotationIndex
     readonly property var transferLevel: state.pendingMenu ? state.pendingMenu.previous : null
+    // Compute this directly from the captured live outer rotation. Reading a
+    // subsequently-added field from pendingMenu.previous.geometry does not
+    // produce a QML change notification and left the transfer snapshot aimed
+    // at its old centre fallback until the handoff frame.
+    readonly property int transferDestinationRotationIndex: transferLevel
+        ? minimallyVisibleRotation(capturedOuterRotationIndex,
+            transferLevel.selectedIndex, transferLevel.items.length) : 0
+    readonly property var transferDisplayEntries: transferLevel
+        ? transferEntries(transferLevel.items.length, capturedOuterRotationIndex,
+            transferDestinationRotationIndex) : []
     // Explicitly mirror the selected parent's return trajectory. Reading a
     // delegate's x/y through itemAt() does not create reliable QML binding
     // dependencies, so consumers need this progress-bound value instead.
@@ -180,8 +323,8 @@ Item {
         const count = level.items.length
         const source = transferSourcePositions[index]
         const sourceAngle = capturedOuterSelectedAngle
-        const destinationAngle = count <= 1 ? (startAngle + endAngle) / 2
-            : startAngle + index * (endAngle - startAngle) / Math.max(1, Math.min(7, count) - 1)
+        const destinationAngle = innerAngle(index, count,
+            transferDestinationRotationIndex, level.selectedIndex)
         const startX = source ? source.centerX : width + capturedOuterCenterOffsetX
             + Math.cos(sourceAngle * Math.PI / 180) * capturedOuterRadius
         const startY = source ? source.centerY : height + capturedOuterCenterOffsetY
@@ -231,9 +374,11 @@ Item {
             ? Math.min(7, root.ancestorDisplayItems.length) : 0
         delegate: FanItem {
             required property int index
-            readonly property real angle: root.ancestorDisplayItems.length <= 1 ? (root.startAngle + root.endAngle) / 2
-                : root.startAngle + index * (root.endAngle - root.startAngle)
-                    / Math.max(1, Math.min(7, root.ancestorDisplayItems.length) - 1)
+            readonly property int itemIndex: root.itemIndexForSlot(index,
+                root.ancestorDisplayItems.length, root.ancestorDisplayRotationIndex)
+            readonly property real angle: root.innerAngle(itemIndex,
+                root.ancestorDisplayItems.length, root.ancestorDisplayRotationIndex,
+                root.ancestorDisplaySelectedIndex)
             readonly property real endCenterX: root.width + root.centerOffsetX
                 + Math.cos(angle * Math.PI / 180) * root.radius
             readonly property real endCenterY: root.height + root.centerOffsetY
@@ -242,8 +387,8 @@ Item {
             readonly property real startCenterY: root.height + height + 48
             readonly property real progress: root.state.ancestorEnterHandoffActive
                 ? 1 : root.state.ancestorEnterActive ? root.state.ancestorEnterProgress : 0
-            modelData: root.ancestorDisplayItems[index]
-            selected: index === root.ancestorDisplaySelectedIndex
+            modelData: root.ancestorDisplayItems[itemIndex]
+            selected: itemIndex === root.ancestorDisplaySelectedIndex
             circular: true
             animateSelection: false
             animateOpacity: false
@@ -252,7 +397,7 @@ Item {
             reveal: 1
             visualOpacity: progress
             cacheActive: true
-            width: index === root.ancestorDisplaySelectedIndex ? root.targetItemSize : 88
+            width: selected ? root.targetItemSize : 88
             height: width
             x: startCenterX + (endCenterX - startCenterX) * progress - width / 2
             y: startCenterY + (endCenterY - startCenterY) * progress - height / 2
@@ -277,9 +422,10 @@ Item {
         model: root.state.parentExitActive ? Math.min(7, root.exitItems.length) : 0
         delegate: FanItem {
             required property int index
-            readonly property real angle: root.exitItems.length <= 1 ? (root.startAngle + root.endAngle) / 2
-                : root.startAngle + index * (root.endAngle - root.startAngle)
-                    / Math.max(1, Math.min(7, root.exitItems.length) - 1)
+            readonly property int itemIndex: root.itemIndexForSlot(index,
+                root.exitItems.length, root.exitRotationIndex)
+            readonly property real angle: root.innerAngle(itemIndex,
+                root.exitItems.length, root.exitRotationIndex, root.exitSelectedIndex)
             readonly property real startCenterX: root.width + root.centerOffsetX
                 + Math.cos(angle * Math.PI / 180) * root.radius
             readonly property real startCenterY: root.height + root.centerOffsetY
@@ -287,8 +433,8 @@ Item {
             readonly property real endCenterX: root.width + width + 48
             readonly property real endCenterY: root.height + height + 48
             readonly property real progress: root.state.parentExitProgress
-            modelData: root.exitItems[index]
-            selected: index === root.exitSelectedIndex
+            modelData: root.exitItems[itemIndex]
+            selected: itemIndex === root.exitSelectedIndex
             circular: true
             animateSelection: false
             animateOpacity: false
@@ -297,7 +443,7 @@ Item {
             reveal: 1
             visualOpacity: 1 - progress
             cacheActive: true
-            width: index === root.exitSelectedIndex ? root.targetItemSize : 88
+            width: selected ? root.targetItemSize : 88
             height: width
             x: startCenterX + (endCenterX - startCenterX) * progress - width / 2
             y: startCenterY + (endCenterY - startCenterY) * progress - height / 2
@@ -308,36 +454,57 @@ Item {
     Repeater {
         model: (root.state.parentTransferActive || root.state.parentTransferHandoffActive)
             && root.transferLevel
-            ? Math.min(7, root.transferLevel.items.length) : 0
+            ? root.transferDisplayEntries.length : 0
         delegate: FanItem {
             required property int index
+            readonly property var transferEntry: root.transferDisplayEntries[index]
             readonly property int transferIndex: root.transferLevel ? root.transferLevel.selectedIndex : 0
             readonly property int itemCount: root.transferLevel ? root.transferLevel.items.length : 0
+            readonly property int itemIndex: transferEntry.itemIndex
             readonly property real logicalOffset: {
-                let offset = (index - root.capturedOuterRotationIndex) % itemCount
+                let offset = (itemIndex - root.capturedOuterRotationIndex) % itemCount
                 if (itemCount > 1 && offset > itemCount / 2) offset -= itemCount
                 if (itemCount > 1 && offset < -itemCount / 2) offset += itemCount
                 return offset
             }
+            readonly property real destinationOffset: {
+                let offset = (itemIndex - root.transferDestinationRotationIndex) % itemCount
+                if (itemCount > 1 && offset > itemCount / 2) offset -= itemCount
+                if (itemCount > 1 && offset < -itemCount / 2) offset += itemCount
+                return offset
+            }
+            readonly property bool sourceVisible: transferEntry.sourceVisible
+            readonly property bool destinationVisible: transferEntry.destinationVisible
+            readonly property int rotationDelta: root.transferDestinationRotationIndex
+                - root.capturedOuterRotationIndex
+            readonly property real syntheticSourceOffset: transferEntry.wrapRole === "in"
+                ? (rotationDelta < 0 ? -4 : 4) : logicalOffset
+            readonly property real syntheticDestinationOffset: transferEntry.wrapRole === "out"
+                ? (rotationDelta < 0 ? 4 : -4) : destinationOffset
             readonly property real sourceAngle: root.capturedOuterSelectedAngle + logicalOffset * root.capturedOuterAngleStep
-            readonly property real destinationAngle: itemCount <= 1
+            readonly property real syntheticSourceAngle: root.capturedOuterSelectedAngle
+                + syntheticSourceOffset * root.capturedOuterAngleStep
+            readonly property real destinationAngle: transferEntry.wrapRole === "out"
                 ? (root.startAngle + root.endAngle) / 2
-                : root.startAngle + index * (root.endAngle - root.startAngle)
-                    / Math.max(1, Math.min(7, itemCount) - 1)
-            readonly property var liveSource: root.transferSourcePositions[index]
-            readonly property real startX: liveSource ? liveSource.centerX : root.width + root.capturedOuterCenterOffsetX
-                + Math.cos(sourceAngle * Math.PI / 180) * root.capturedOuterRadius
-            readonly property real startY: liveSource ? liveSource.centerY : root.height + root.capturedOuterCenterOffsetY
-                + Math.sin(sourceAngle * Math.PI / 180) * root.capturedOuterRadius
+                    + syntheticDestinationOffset / 6 * (root.endAngle - root.startAngle)
+                : root.innerAngle(itemIndex, itemCount,
+                    root.transferDestinationRotationIndex, transferIndex)
+            readonly property var liveSource: root.transferSourcePositions[itemIndex]
+            readonly property real startX: transferEntry.wrapRole !== "in" && liveSource
+                ? liveSource.centerX : root.width + root.capturedOuterCenterOffsetX
+                    + Math.cos(syntheticSourceAngle * Math.PI / 180) * root.capturedOuterRadius
+            readonly property real startY: transferEntry.wrapRole !== "in" && liveSource
+                ? liveSource.centerY : root.height + root.capturedOuterCenterOffsetY
+                    + Math.sin(syntheticSourceAngle * Math.PI / 180) * root.capturedOuterRadius
             readonly property real endX: root.width + root.centerOffsetX
                 + Math.cos(destinationAngle * Math.PI / 180) * root.radius
             readonly property real endY: root.height + root.centerOffsetY
                 + Math.sin(destinationAngle * Math.PI / 180) * root.radius
-            readonly property real finalSize: index === transferIndex ? root.targetItemSize : 88
+            readonly property real finalSize: itemIndex === transferIndex ? root.targetItemSize : 88
             readonly property real sourceSize: liveSource ? Math.min(liveSource.width, liveSource.height)
                 : Math.min(root.capturedOuterItemWidth, root.capturedOuterItemHeight)
-            modelData: root.transferLevel.items[index]
-            selected: index === transferIndex
+            modelData: root.transferLevel.items[itemIndex]
+            selected: itemIndex === transferIndex
             forceSelectionGlow: selected
             circular: true
             animateSelection: false
@@ -345,6 +512,9 @@ Item {
             animateFocus: false
             shown: true
             reveal: 1
+            visualOpacity: sourceVisible && destinationVisible ? 1
+                : sourceVisible ? 1 - root.state.parentTransferProgress
+                : root.state.parentTransferProgress
             cacheActive: true
             // Transfer parents as circles throughout. A rectangular outer card
             // must not be stretched into the inner circular ring.
@@ -363,23 +533,26 @@ Item {
             ? 0 : Math.min(7, root.displayItems.length)
         delegate: FanItem {
             required property int index
-            readonly property real angle: root.displayItems.length <= 1 ? (root.startAngle + root.endAngle) / 2
-                : root.startAngle + index * (root.endAngle - root.startAngle) / Math.max(1, Math.min(7, root.displayItems.length) - 1)
+            readonly property int itemIndex: root.itemIndexForSlot(index,
+                root.displayItems.length, root.displayRotationIndex)
+            readonly property real angle: root.innerAngle(itemIndex,
+                root.displayItems.length, root.displayRotationIndex,
+                root.displaySelectedParent)
             readonly property real ringCenterX: root.width + root.centerOffsetX + Math.cos(angle * Math.PI / 180) * root.radius
             readonly property real ringCenterY: root.height + root.centerOffsetY + Math.sin(angle * Math.PI / 180) * root.radius
-            readonly property real returnOffset: root.capturedLogicalOffset(index,
+            readonly property real returnOffset: root.capturedLogicalOffset(itemIndex,
                 root.displayItems.length)
             readonly property real returnAngle: root.capturedOuterSelectedAngle
                 + returnOffset * root.capturedOuterAngleStep
             readonly property var capturedTarget: root.displayItems.length === 6
-                ? root.capturedOuterItemPositions[index] : null
+                ? root.capturedOuterItemPositions[itemIndex] : null
             readonly property real returnCenterX: capturedTarget ? capturedTarget.centerX
                 : root.width + root.capturedOuterCenterOffsetX
                     + Math.cos(returnAngle * Math.PI / 180) * root.capturedOuterRadius
             readonly property real returnCenterY: capturedTarget ? capturedTarget.centerY
                 : root.height + root.capturedOuterCenterOffsetY
                     + Math.sin(returnAngle * Math.PI / 180) * root.capturedOuterRadius
-            readonly property var liveReturnSource: root.returnSourcePositions[index]
+            readonly property var liveReturnSource: root.returnSourcePositions[itemIndex]
             readonly property real returnStartCenterX: liveReturnSource ? liveReturnSource.centerX : ringCenterX
             readonly property real returnStartCenterY: liveReturnSource ? liveReturnSource.centerY : ringCenterY
             readonly property bool returning: root.state.parentReturnActive || root.state.parentReturnHandoffActive
@@ -412,8 +585,8 @@ Item {
                 ? targetWidth + (returnBaseWidth - targetWidth) * returnProgress : targetWidth
             readonly property real baseHeight: returning
                 ? targetHeight + (returnBaseHeight - targetHeight) * returnProgress : targetHeight
-            modelData: root.displayItems[index]
-            selected: index === root.displaySelectedParent
+            modelData: root.displayItems[itemIndex]
+            selected: itemIndex === root.displaySelectedParent
             forceSelectionGlow: selected
             circular: true
             animateSelection: false

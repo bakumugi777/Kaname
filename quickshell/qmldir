@@ -1,6 +1,7 @@
 singleton Theme 1.0 Theme.qml
 singleton Config 1.0 Config.qml
 Kaname 1.0 Kaname.qml
+ApplicationHistory 1.0 ApplicationHistory.qml
 DmenuSource 1.0 DmenuSource.qml
 DesktopEntrySource 1.0 DesktopEntrySource.qml
 MenuSource 1.0 MenuSource.qml

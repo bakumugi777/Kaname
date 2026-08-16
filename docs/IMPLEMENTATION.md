@@ -25,6 +25,7 @@ misrouting.
 
 - `shell.qml`: minimal standalone `ShellRoot` entry point
 - `Kaname.qml`: embeddable `Scope`, composition, and IPC endpoint
+- `ApplicationHistory.qml`: persisted most-recently-launched desktop entry IDs
 - `LauncherState.qml`: request, filtering, selection, and response lifecycle
 - `DmenuSource.qml`: request-owned input files
 - `LauncherWindow.qml`: layer-shell window and input routing
@@ -37,6 +38,11 @@ directory module. The standalone entry point instantiates the same component,
 so embedded and standalone operation do not maintain separate implementations.
 The CLI selects the owning Quickshell configuration with `KANAME_QML_DIR`; an
 embedded host must point this variable at the shared shell path.
+
+Application history records only desktop entries activated through Kaname. It
+keeps a deduplicated, bounded list under `XDG_STATE_HOME`, writes it atomically,
+and invalidates the categorized application cache immediately. System-wide
+launch observation is intentionally out of scope.
 
 The initial UI values are seven items, radius 760, and angles 180–270 degrees.
 Delegates are clamped to an eight-pixel safe area so experimental geometry cannot

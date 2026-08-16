@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Visually inspect hierarchy transitions with 6, 7, 8, or 9 root entries.
+set -euo pipefail
+
+usage() {
+  printf '%s\n' 'usage: kaname-parent-ring-demo {6|7|8|9} [SCREEN]' >&2
+}
+
+count=${1:-}
+screen=${2:-}
+case "$count" in
+  6|7|8|9) ;;
+  -h|--help) usage; exit 0 ;;
+  *) usage; exit 2 ;;
+esac
+
+script_file=$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")
+install_root=$(CDPATH='' cd -- "$(dirname -- "$script_file")/.." && pwd)
+kaname_bin=${KANAME_BIN:-"$install_root/bin/kaname"}
+
+icons=(
+  applications-internet
+  applications-multimedia
+  applications-graphics
+  applications-utilities
+  preferences-system
+  utilities-terminal
+  folder
+  document-open-recent
+  applications-other
+)
+
+generate_fixture() {
+  local index icon
+  for ((index = 1; index <= count; ++index)); do
+    icon=${icons[index - 1]}
+    printf '{"id":"parent-%d","label":"Parent %d of %d","description":"Parent-ring layout fixture %d/%d","icon":"%s","children":[{"id":"parent-%d-child-a","label":"Child A","description":"First child of Parent %d","icon":"go-next","value":"parent-%d-child-a"},{"id":"parent-%d-child-b","label":"Child B","description":"Second child of Parent %d","icon":"folder","value":"parent-%d-child-b"},{"id":"parent-%d-child-c","label":"Child C","description":"Third child of Parent %d","icon":"preferences-system","value":"parent-%d-child-c"}]}\n' \
+      "$index" "$index" "$count" "$index" "$count" "$icon" \
+      "$index" "$index" "$index" \
+      "$index" "$index" "$index" \
+      "$index" "$index" "$index"
+  done
+}
+
+args=(--jsonl --output value --prompt "Parent ring: ${count} entries")
+if [[ -n "$screen" ]]; then
+  args+=(--screen "$screen")
+fi
+
+generate_fixture | "$kaname_bin" "${args[@]}"

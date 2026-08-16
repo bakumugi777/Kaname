@@ -2,6 +2,9 @@ import QtQuick
 import Quickshell
 
 QtObject {
+    id: root
+    property var recentIds: []
+
     function items() {
         const result = []
         const entries = DesktopEntries.applications.values
@@ -157,6 +160,41 @@ QtObject {
                 image: "", isImage: false,
                 key: typeof allConfig.key === "string" ? allConfig.key : "",
                 children: all, searchText: "all applications " + allLabel.toLowerCase()
+            })
+        }
+
+        const recentConfig = Config.applicationMenu && Config.applicationMenu.recent
+            ? Config.applicationMenu.recent : ({})
+        if (recentConfig.enabled !== false) {
+            const byId = ({})
+            for (let i = 0; i < all.length; ++i) byId[all[i].value] = all[i]
+            const recentApplications = []
+            const limitValue = Number(recentConfig.limit)
+            const recentLimit = isFinite(limitValue)
+                ? Math.max(1, Math.min(100, Math.round(limitValue))) : 10
+            for (let i = 0; i < root.recentIds.length && recentApplications.length < recentLimit; ++i) {
+                const application = byId[root.recentIds[i]]
+                if (application) recentApplications.push(application)
+            }
+            const recentId = typeof recentConfig.id === "string" && recentConfig.id.length
+                ? recentConfig.id : "recent"
+            const recentLabel = typeof recentConfig.label === "string"
+                ? recentConfig.label : "Recently Used"
+            const recentChildren = recentApplications.length ? recentApplications : [{
+                id: "applications-recent-empty", type: "status", label: "No recent applications",
+                description: "Applications launched from Kaname appear here",
+                icon: "document-open-recent", image: "", isImage: false,
+                value: "", key: "", disabled: true, searchText: "no recent applications"
+            }]
+            result.push({
+                id: "applications-" + recentId, type: "submenu", label: recentLabel,
+                description: categoryDescription(recentApplications.length),
+                icon: typeof recentConfig.icon === "string"
+                    ? recentConfig.icon : "document-open-recent",
+                image: "", isImage: false,
+                key: typeof recentConfig.key === "string" ? recentConfig.key : "",
+                children: recentChildren,
+                searchText: "recent applications " + recentLabel.toLowerCase()
             })
         }
         for (let i = 0; i < categories.length; ++i) {

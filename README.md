@@ -18,6 +18,7 @@ English documentation: [docs/README.en.md](docs/README.en.md)
 ## 主な機能
 
 - XDG Desktop Entryを分類して表示するアプリランチャー
+- Kanameから直近に起動した10アプリの履歴
 - `--dmenu`によるwofi/dmenu風の標準入出力連携
 - JSON Linesによる任意深さの階層メニュー、画像、アイコン、説明文
 - JSON設定によるメニュー、形状、透明度、キーバインド、プロファイルの変更
@@ -379,6 +380,9 @@ Wayland/Niri上の表示、フォーカス、アイコンテーマ、画像形�
 - 同時に複数の対話要求は処理せず、後から来た要求へbusyを返します。
 - providerはstdoutのEOFを受け取ってから候補を表示します。
 - `--applications`はQuickshellが取得したXDG Desktop Entryを利用します。
+- Recently UsedはKaname経由で起動した直近10件だけを記録します。履歴は
+  `$XDG_STATE_HOME/kaname/application-usage.json`、未設定時は
+  `~/.local/state/kaname/application-usage.json`へ保存されます。
 - 特殊な`Terminal=true`エントリに対する独自ターミナルラッパーはありません。
 - 複数モニターでは`--screen eDP-1`または`display.screen`を指定できます。
 

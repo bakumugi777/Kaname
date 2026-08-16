@@ -35,6 +35,8 @@ The locations can be overridden with:
   KANAME_MENUS_FILE    Path to menus.json
   KANAME_THEME_FILE    Path to the generated theme JSON
   KANAME_QML_DIR       Quickshell configuration directory used by the CLI
+  KANAME_APPLICATION_HISTORY_FILE
+                       Recently used application history JSON
 
 KANAME_QML_DIR normally needs no override. When Kaname is embedded in a shared
 Quickshell configuration, set it to the directory containing the shared
@@ -69,8 +71,8 @@ Complete example:
     "geometry": {
       "width": 1100,
       "height": 900,
-      "centerOffsetX": -100,
-      "centerOffsetY": 30,
+      "centerOffsetX": 0,
+      "centerOffsetY": 0,
       "radius": 760,
       "startAngle": 180,
       "endAngle": 270,
@@ -265,6 +267,13 @@ Configures the categories, order, and icons shown at the root of
         ]
       }
     ],
+    "recent": {
+      "id": "recent",
+      "label": "Recently Used",
+      "icon": "document-open-recent",
+      "key": "r",
+      "limit": 10
+    },
     "fallback": {
       "id": "other",
       "label": "Other",
@@ -292,6 +301,42 @@ every application and, when enabled, is the first and initially focused root
 entry. Add "enabled": false to fallback or all to hide that entry.
 The categories array also controls root-menu order. Changes apply the next time
 --applications is opened.
+
+
+3.8 Recently used applications
+
+Kaname records desktop entries launched through Kaname and displays them in
+most-recent-first order without duplicates. The bundled configuration retains
+the latest ten. Applications launched through another launcher, a Niri binding,
+or a terminal are not recorded.
+
+  "recent": {
+    "id": "recent",
+    "label": "Recently Used",
+    "icon": "document-open-recent",
+    "key": "r",
+    "limit": 10
+  }
+
+  enabled   Set false to hide Recently Used
+  id        Internal identifier
+  label     Root-level display name
+  icon      Name from the active system icon theme
+  key       Shortcut local to the application root
+  limit     Number retained and displayed, from 1 to 100; default 10
+
+History is stored at:
+
+  $XDG_STATE_HOME/kaname/application-usage.json
+
+When XDG_STATE_HOME is unset, Kaname uses:
+
+  ~/.local/state/kaname/application-usage.json
+
+KANAME_APPLICATION_HISTORY_FILE overrides the destination. To reset history,
+stop the Quickshell instance which owns Kaname, then remove the file. Desktop
+entries which no longer exist are skipped. Missing or malformed history does
+not prevent other application categories from working.
 
 
 4. menus.json

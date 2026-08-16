@@ -101,15 +101,21 @@ Item {
             readonly property real logicalOffset: root.circularOffset(index)
             property real animatedOffset: logicalOffset
             property bool snappingOffset: false
-            // A normalized offset can change -5 -> +4 after it has moved
-            // completely outside the fan. Snap there while off-screen; the
-            // following scroll moves +4 -> +3 and is the visible entrance.
+            // A normalized offset wraps from one end of the circular list to
+            // the other. With seven entries both ends are still partly on
+            // screen, so snapping -3 -> +3 makes a card appear to stick to an
+            // edge. Place it one slot beyond the opposite edge and start its
+            // entrance in the same event turn as every other card's movement.
             onLogicalOffsetChanged: {
                 const count = root.state.items.length
                 if (count > 1 && Math.abs(logicalOffset - animatedOffset) > count / 2) {
+                    const destination = logicalOffset
                     snappingOffset = true
-                    animatedOffset = logicalOffset
-                    Qt.callLater(() => { snappingOffset = false })
+                    animatedOffset = destination + (destination < 0 ? -1 : 1)
+                    Qt.callLater(() => {
+                        snappingOffset = false
+                        animatedOffset = destination
+                    })
                 } else {
                     animatedOffset = logicalOffset
                 }
@@ -229,7 +235,10 @@ Item {
 
             Behavior on animatedOffset {
                 enabled: !root.returningToParent && !fanItem.snappingOffset
-                NumberAnimation { duration: Config.motionDuration(Math.max(260, Config.animationMs * 1.8)); easing.type: Easing.OutCubic }
+                NumberAnimation {
+                    duration: Config.motionDuration(Math.max(260, Config.animationMs * 1.8))
+                    easing.type: Easing.OutCubic
+                }
             }
             Behavior on reveal {
                 enabled: !root.state.childRevealActive && !root.state.childDismissActive

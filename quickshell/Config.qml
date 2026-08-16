@@ -8,8 +8,8 @@ QtObject {
     property string configPath: Quickshell.env("KANAME_CONFIG_FILE") || (Quickshell.env("HOME") + "/.config/kaname/config.json")
     property int windowWidth: 1100
     property int windowHeight: 900
-    property real centerOffsetX: -100
-    property real centerOffsetY: 30
+    property real centerOffsetX: 0
+    property real centerOffsetY: 0
     property real radius: 760
     property real startAngle: 180
     property real endAngle: 270
@@ -54,6 +54,8 @@ QtObject {
             { id: "tools", label: "Tools", icon: "applications-utilities", key: "t",
                 match: ["Utility", "Development", "FileManager", "TerminalEmulator", "TextEditor", "Archiving"] }
         ],
+        recent: { id: "recent", label: "Recently Used", icon: "document-open-recent",
+            key: "r", limit: 10 },
         fallback: { id: "other", label: "Other", icon: "applications-other", key: "o" },
         all: { id: "all", label: "All Applications", icon: "view-app-grid-symbolic", key: "a" }
     })

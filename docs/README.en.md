@@ -18,6 +18,7 @@ Runtime, Niri autostart, standalone, and embedded setups are covered in
 ## Features
 
 - Categorized XDG desktop-entry launcher
+- Ten most recently launched applications, tracked through Kaname
 - dmenu-compatible line input and exact stdout selection
 - Arbitrarily nested JSON Lines menus with icons, images, and descriptions
 - JSON configuration for menus, geometry, opacity, keys, and profiles

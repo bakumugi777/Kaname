@@ -349,11 +349,11 @@ PanelWindow {
                 loops: Animation.Infinite
                 NumberAnimation {
                     target: content; property: "fanDisplayMix"
-                    from: 0.06; to: 0.62; duration: 3200; easing.type: Easing.InOutSine
+                    from: 0.06; to: 0.62; duration: 2500; easing.type: Easing.InOutSine
                 }
                 NumberAnimation {
                     target: content; property: "fanDisplayMix"
-                    from: 0.62; to: 0.06; duration: 3800; easing.type: Easing.InOutSine
+                    from: 0.62; to: 0.06; duration: 2900; easing.type: Easing.InOutSine
                 }
             }
             Connections {
@@ -575,6 +575,10 @@ PanelWindow {
             id: parentRing
             anchors.fill: parent
             state: window.launcherState
+            centerOffsetX: fanLayout.centerOffsetX
+            centerOffsetY: fanLayout.centerOffsetY
+            startAngle: fanLayout.startAngle
+            endAngle: fanLayout.endAngle
             outerRadius: fanLayout.radius
             outerCenterOffsetX: fanLayout.centerOffsetX
             outerCenterOffsetY: fanLayout.centerOffsetY
@@ -983,8 +987,16 @@ PanelWindow {
 
         Keys.onPressed: event => {
             if (event.key === Qt.Key_Escape) {
-                if (window.launcherState.searchMode) window.launcherState.endSearch()
-                else window.launcherState.cancel()
+                if (window.launcherState.searchMode) {
+                    window.launcherState.endSearch()
+                    // TextInput keeps active focus after it becomes read-only
+                    // and consumes the following Backspace. Return focus after
+                    // the Escape dispatch has completed so hierarchy keys are
+                    // handled by this Item again.
+                    Qt.callLater(() => content.forceActiveFocus())
+                } else {
+                    window.launcherState.cancel()
+                }
                 event.accepted = true
             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 window.launcherState.accept(); event.accepted = true

@@ -22,9 +22,13 @@ Scope {
         onApplicationsRequested: root.launcherState.enterMenu(root.applicationsTitle(),
                                                                root.cachedApplications())
         onProviderRequested: item => providerRunner.run(item)
+        onDesktopApplicationLaunched: desktopId => applicationHistory.record(desktopId)
     }
     property DmenuSource source: DmenuSource {}
-    property DesktopEntrySource desktopSource: DesktopEntrySource {}
+    property ApplicationHistory applicationHistory: ApplicationHistory {}
+    property DesktopEntrySource desktopSource: DesktopEntrySource {
+        recentIds: root.applicationHistory.recentIds
+    }
     property MenuSource menuSource: MenuSource {}
 
     function applicationsTitle() {
@@ -61,6 +65,13 @@ Scope {
             // Quickshell emits this when desktop files are added, removed, or
             // refreshed. Rebuild after a short debounce because package
             // installation can update several entries in one burst.
+            root.invalidateApplicationsCache()
+        }
+    }
+
+    Connections {
+        target: root.applicationHistory
+        function onChanged() {
             root.invalidateApplicationsCache()
         }
     }
@@ -260,4 +271,3 @@ Scope {
         onCompleted: (items, error) => root.launcherState.completeProvider(items, error)
     }
 }
-
