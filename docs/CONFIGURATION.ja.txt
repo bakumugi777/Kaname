@@ -18,7 +18,15 @@ Kaname 設定ガイド（日本語）
   ~/.cache/matugen/kaname-colors.json
       matugenが生成し、Kanameが監視するテーマ色
 
-初期ファイルは次のように配置できます。
+flakeのHome Manager moduleを使う場合は、初期ファイルの手動コピーは不要です。
+
+  imports = [ inputs.kaname.homeManagerModules.default ];
+  programs.kaname.enable = true;
+
+設定変更はprograms.kaname.settings、メニュー変更はprograms.kaname.menusへ記述します。
+生成されたJSONはNix storeへのリンクなので、直接編集しないでください。
+
+Home Managerを使わない場合は、初期ファイルを次のように配置できます。
 
   mkdir -p ~/.config/kaname
   cp config/default.json ~/.config/kaname/config.json

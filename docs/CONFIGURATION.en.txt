@@ -18,7 +18,16 @@ Kaname normally uses these files:
   ~/.cache/matugen/kaname-colors.json
       The generated matugen palette watched by Kaname.
 
-Install initial copies with:
+No manual copy is needed when using the flake's Home Manager module:
+
+  imports = [ inputs.kaname.homeManagerModules.default ];
+  programs.kaname.enable = true;
+
+Put setting overrides in programs.kaname.settings and menu overrides in
+programs.kaname.menus. The generated JSON files are Nix store links and should
+not be edited directly.
+
+Without Home Manager, install initial copies with:
 
   mkdir -p ~/.config/kaname
   cp config/default.json ~/.config/kaname/config.json

@@ -8,6 +8,11 @@
       systems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
     in {
+      homeManagerModules = {
+        default = import ./nix/home-manager.nix { inherit self; };
+        kaname = self.homeManagerModules.default;
+      };
+
       packages = forAllSystems (system:
         let
           pkgs = import nixpkgs { inherit system; };

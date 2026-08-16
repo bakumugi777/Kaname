@@ -59,37 +59,30 @@ Home Managerを使用する場合:
 
 ```nix
 # home.nix
-{ inputs, pkgs, ... }:
-let
-  kanamePackage = inputs.kaname.packages.${pkgs.system}.default;
-in {
-  home.packages = [ kanamePackage ];
+{ inputs, ... }:
+{
+  imports = [ inputs.kaname.homeManagerModules.default ];
 
-  xdg.configFile."kaname/config.json".source =
-    "${kanamePackage}/share/kaname/config/default.json";
-  xdg.configFile."kaname/menus.json".source =
-    "${kanamePackage}/share/kaname/config/menus.json";
+  programs.kaname = {
+    enable = true;
 
-  systemd.user.services.kaname = {
-    Unit = {
-      Description = "Kaname Quickshell launcher";
-      PartOf = [ "graphical-session.target" ];
-      After = [ "graphical-session.target" ];
-    };
-    Service = {
-      ExecStart = "${kanamePackage}/bin/kaname-shell";
-      Restart = "on-failure";
-    };
-    Install.WantedBy = [ "graphical-session.target" ];
+    # 既定値から変更する項目だけを書けます。
+    settings.opacity.background = 0.72;
   };
 }
 ```
+
+このmoduleはパッケージを導入し、`~/.config/kaname/config.json`、`menus.json`、
+matugenテンプレートを生成します。`autostart`の既定値は`false`です。通常はNiriの
+`spawn-at-startup "kaname-shell"`で起動してください。systemdユーザーサービスとして
+起動したい場合だけ`autostart = true`にします。別のQuickshellへ組み込む場合も
+`false`のままにしてください。
+メニューは`programs.kaname.menus`、その他の設定は`programs.kaname.settings`で管理します。
 
 反映と確認:
 
 ```bash
 home-manager switch --flake .#ユーザー名
-systemctl --user status kaname.service
 kaname --applications
 ```
 
@@ -99,6 +92,9 @@ Home Managerを使わず、Nix profileへ直接インストールする場合:
 nix profile install github:OWNER/kaname#kaname
 kaname --applications
 ```
+
+`nix profile install`はパッケージだけを導入し、ホームディレクトリの設定ファイルは
+生成しません。設定の自動配置には上記Home Manager moduleか`./install.sh`を使用します。
 
 インストールせず一時的に試す場合:
 
@@ -324,9 +320,8 @@ cp "$(nix build --no-link --print-out-paths github:OWNER/kaname#kaname)/share/ka
   ~/.config/kaname/menus.json
 ```
 
-Home Managerの`xdg.configFile`で同梱設定を直接参照すると、そのファイルはNix storeへの
-シンボリックリンクになります。自分で編集したい場合は、設定内容をhome.nixに生成するか、
-通常ファイルとしてコピーしてください。
+Home Manager moduleを使う場合、ファイルはNix storeへのシンボリックリンクになります。
+直接編集せず、`programs.kaname.settings`と`programs.kaname.menus`を変更してください。
 
 詳しいフィールド、メニュー例、JSON Lines、matugenテンプレートについては
 [日本語設定ガイド](docs/CONFIGURATION.ja.txt)を参照してください。
@@ -349,6 +344,16 @@ Kanameはファイルを監視し、正常なJSONへの更新をQuickshellの再
 ファイルが存在しない場合や内容が不正な場合は内蔵色を使用し、実行は継続します。
 既存のpywal設定には干渉しません。詳しいスキーマとテンプレート例は
 [日本語設定ガイド](docs/CONFIGURATION.ja.txt)の「matugenテーマJSON」を参照してください。
+
+Home Manager moduleはテンプレートだけを配置し、既存の
+`~/.config/matugen/config.toml`は上書きしません。システムのmatugen実行でKanameの色も
+生成する場合は、既存のmatugen設定へ次を追加してください。
+
+```toml
+[templates.kaname]
+input_path = "~/.config/matugen/templates/kaname-colors.json"
+output_path = "~/.cache/matugen/kaname-colors.json"
+```
 
 ## アイコンテーマ
 
