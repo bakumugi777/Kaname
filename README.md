@@ -1,4 +1,4 @@
-# Kaname（要）
+# 要（Kaname）
 
 Kanameは、[Quickshell](https://quickshell.org/)で動作するNiri向けの扇形ランチャーです。
 画面右下から広がるUIで、アプリケーション、ユーザー定義メニュー、標準入力から渡した
