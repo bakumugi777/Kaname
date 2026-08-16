@@ -42,68 +42,13 @@ Kaname自身は壁紙の探索・適用、動画再生、ダウンロード、�
 
 以下の`OWNER`は、公開したGitHubアカウント名へ置き換えてください。
 
-### インストールスクリプト
+### 推奨: flakeから導入
 
-Nixを導入済みのLinuxでは、リポジトリを取得して次を実行できます。
+Kanameの標準的な導入方法は、GitHub上のflakeをNixOSまたはHome Managerから
+直接参照する方法です。`flake.lock`により、Kanameが使用するQuickshellと依存関係も
+同じ構成で解決されます。
 
-```bash
-git clone https://github.com/OWNER/kaname.git
-cd kaname
-./install.sh
-```
-
-スクリプトはNix profileへKanameをインストールし、まだ存在しない場合だけ
-`~/.config/kaname/`へ初期設定をコピーします。既存設定は上書きしません。
-
-```bash
-./install.sh --help
-./install.sh --no-config
-./install.sh --refresh    # 既存設定を.bakへ退避して更新
-./install.sh --source github:OWNER/kaname
-```
-
-Nix自体は自動インストールしません。Nixがない環境では、公式手順でNixを導入してから
-実行してください。NixOS/Niri以外は未検証であり、動作保証や個別サポートの対象外です。
-
-### Nixを使わない実験的インストール
-
-Quickshell 0.3.0とQt 6をディストリビューション側で導入した後、ユーザー領域へ
-インストールできます。
-
-```bash
-./install-non-nix.sh
-```
-
-既定の配置先は`~/.local/lib/kaname`と`~/.local/bin`です。`sudo`は使用せず、
-システムの依存パッケージも自動導入しません。
-
-```bash
-./install-non-nix.sh --help
-./install-non-nix.sh --prefix "$HOME/.local"
-./install-non-nix.sh --no-config
-./install-non-nix.sh --refresh
-```
-
-画像が表示されない場合は、各ディストリビューションのQt 6画像形式プラグインも必要です。
-パッケージ名が異なるため、インストーラーでは自動処理しません。非Nix版は実験的であり、
-Quickshell APIや依存関係の違いを含めてサポート対象外です。
-
-### Nixコマンドを直接使う
-
-一時的に試す場合:
-
-```bash
-nix run github:OWNER/kaname#kaname -- --applications
-```
-
-ユーザープロファイルへインストールする場合:
-
-```bash
-nix profile install github:OWNER/kaname#kaname
-kaname --applications
-```
-
-Home Managerで管理する例:
+Home Managerを使用する場合:
 
 ```nix
 # flake.nix
@@ -148,8 +93,68 @@ systemctl --user status kaname.service
 kaname --applications
 ```
 
+Home Managerを使わず、Nix profileへ直接インストールする場合:
+
+```bash
+nix profile install github:OWNER/kaname#kaname
+kaname --applications
+```
+
+インストールせず一時的に試す場合:
+
+```bash
+nix run github:OWNER/kaname#kaname -- --applications
+```
+
 `kaname-shell`を常駐させていなくても、`kaname` CLIは必要に応じてQuickshellを
 自動起動します。常駐サービスにすると初回表示の待ち時間を減らせます。
+
+### 代替: インストールスクリプト
+
+Nixを導入済みのLinuxでは、リポジトリを取得して次を実行できます。
+
+```bash
+git clone https://github.com/OWNER/kaname.git
+cd kaname
+./install.sh
+```
+
+スクリプトはNix profileへKanameをインストールし、まだ存在しない場合だけ
+`~/.config/kaname/`へ初期設定をコピーします。既存設定は上書きしません。
+
+```bash
+./install.sh --help
+./install.sh --no-config
+./install.sh --refresh    # 既存設定を.bakへ退避して更新
+./install.sh --source github:OWNER/kaname
+```
+
+このスクリプトも内部ではflakeをNix profileへインストールします。Nix自体は
+自動インストールしません。NixOS/Niri以外は未検証であり、動作保証や個別サポートの
+対象外です。
+
+### Nixを使わない実験的インストール
+
+Quickshell 0.3.0とQt 6をディストリビューション側で導入した後、ユーザー領域へ
+インストールできます。
+
+```bash
+./install-non-nix.sh
+```
+
+既定の配置先は`~/.local/lib/kaname`と`~/.local/bin`です。`sudo`は使用せず、
+システムの依存パッケージも自動導入しません。
+
+```bash
+./install-non-nix.sh --help
+./install-non-nix.sh --prefix "$HOME/.local"
+./install-non-nix.sh --no-config
+./install-non-nix.sh --refresh
+```
+
+画像が表示されない場合は、各ディストリビューションのQt 6画像形式プラグインも必要です。
+パッケージ名が異なるため、インストーラーでは自動処理しません。非Nix版は実験的であり、
+Quickshell APIや依存関係の違いを含めてサポート対象外です。
 
 ## 単独起動と共通Quickshellへの組み込み
 

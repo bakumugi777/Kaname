@@ -41,7 +41,74 @@ Other compositors and Quickshell versions are not supported or guaranteed.
 
 Replace `OWNER` with the GitHub account that hosts the repository.
 
-### Installer script
+### Recommended: install from the flake
+
+The primary installation method is to reference Kaname's GitHub flake from
+NixOS or Home Manager. The locked flake resolves Kaname's Quickshell runtime
+and dependencies as one reproducible package.
+
+Home Manager flake input:
+
+```nix
+{
+  inputs.kaname.url = "github:OWNER/kaname";
+}
+```
+
+Home Manager configuration:
+
+```nix
+{ inputs, pkgs, ... }:
+let
+  kanamePackage = inputs.kaname.packages.${pkgs.system}.default;
+in {
+  home.packages = [ kanamePackage ];
+
+  xdg.configFile."kaname/config.json".source =
+    "${kanamePackage}/share/kaname/config/default.json";
+  xdg.configFile."kaname/menus.json".source =
+    "${kanamePackage}/share/kaname/config/menus.json";
+
+  systemd.user.services.kaname = {
+    Unit = {
+      Description = "Kaname Quickshell launcher";
+      PartOf = [ "graphical-session.target" ];
+      After = [ "graphical-session.target" ];
+    };
+    Service = {
+      ExecStart = "${kanamePackage}/bin/kaname-shell";
+      Restart = "on-failure";
+    };
+    Install.WantedBy = [ "graphical-session.target" ];
+  };
+}
+```
+
+Apply and verify the configuration:
+
+```bash
+home-manager switch --flake .#USERNAME
+systemctl --user status kaname.service
+kaname --applications
+```
+
+Without Home Manager, install the package directly into a Nix profile:
+
+```bash
+nix profile install github:OWNER/kaname#kaname
+kaname --applications
+```
+
+To try it without installing:
+
+```bash
+nix run github:OWNER/kaname#kaname -- --applications
+```
+
+The CLI starts Quickshell automatically when needed. Running `kaname-shell` as
+a user service reduces first-open latency.
+
+### Alternative: installer script
 
 On a Linux system with Nix already installed:
 
@@ -51,7 +118,8 @@ cd kaname
 ./install.sh
 ```
 
-The script installs Kaname into the current Nix profile and copies initial
+The script is a wrapper around installing the flake into the current Nix
+profile. It also copies initial
 configuration files only when they do not already exist. It never installs Nix
 itself or silently overwrites your configuration.
 
@@ -85,59 +153,6 @@ not use sudo or install system dependencies.
 Your distribution's Qt 6 image-format plugins may also be required. Package
 names differ between distributions, so dependency installation is deliberately
 left to the user. This installation method is experimental and unsupported.
-
-### Direct Nix commands
-
-```bash
-nix run github:OWNER/kaname#kaname -- --applications
-```
-
-To install it into a Nix profile:
-
-```bash
-nix profile install github:OWNER/kaname#kaname
-kaname --applications
-```
-
-Home Manager flake input:
-
-```nix
-{
-  inputs.kaname.url = "github:OWNER/kaname";
-}
-```
-
-Home Manager module:
-
-```nix
-{ inputs, pkgs, ... }:
-let
-  kanamePackage = inputs.kaname.packages.${pkgs.system}.default;
-in {
-  home.packages = [ kanamePackage ];
-
-  xdg.configFile."kaname/config.json".source =
-    "${kanamePackage}/share/kaname/config/default.json";
-  xdg.configFile."kaname/menus.json".source =
-    "${kanamePackage}/share/kaname/config/menus.json";
-
-  systemd.user.services.kaname = {
-    Unit = {
-      Description = "Kaname Quickshell launcher";
-      PartOf = [ "graphical-session.target" ];
-      After = [ "graphical-session.target" ];
-    };
-    Service = {
-      ExecStart = "${kanamePackage}/bin/kaname-shell";
-      Restart = "on-failure";
-    };
-    Install.WantedBy = [ "graphical-session.target" ];
-  };
-}
-```
-
-The CLI starts Quickshell automatically when needed. Running `kaname-shell` as
-a user service reduces first-open latency.
 
 ## Standalone and embedded use
 
