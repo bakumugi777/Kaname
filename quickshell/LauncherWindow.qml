@@ -31,6 +31,33 @@ PanelWindow {
         opacity: Config.profileValue(window.launcherState.profile, "opacity", "master", Config.masterOpacity)
         property real fanDisplayMix: 0.24
         readonly property real darkFanOpacity: 1 - fanDisplayMix * 0.35
+        readonly property string fanInnerColorPrefix: "rgba("
+            + Math.round((Theme.surface.r * 0.62 + Theme.primary.r * 0.30
+                + Theme.tertiary.r * 0.08) * 255) + ","
+            + Math.round((Theme.surface.g * 0.62 + Theme.primary.g * 0.30
+                + Theme.tertiary.g * 0.08) * 255) + ","
+            + Math.round((Theme.surface.b * 0.62 + Theme.primary.b * 0.30
+                + Theme.tertiary.b * 0.08) * 255) + ","
+        readonly property string fanOuterColorPrefix: "rgba("
+            + Math.round((Theme.surface.r * 0.68 + Theme.secondary.r * 0.24
+                + Theme.primary.r * 0.08) * 255) + ","
+            + Math.round((Theme.surface.g * 0.68 + Theme.secondary.g * 0.24
+                + Theme.primary.g * 0.08) * 255) + ","
+            + Math.round((Theme.surface.b * 0.68 + Theme.secondary.b * 0.24
+                + Theme.primary.b * 0.08) * 255) + ","
+
+        function fanGradient(ctx, centerX, centerY, fixedRadius, outerRadius, innerAlpha) {
+            const gradient = ctx.createRadialGradient(centerX, centerY, 0,
+                centerX, centerY, fixedRadius)
+            gradient.addColorStop(0, fanInnerColorPrefix + innerAlpha + ")")
+            gradient.addColorStop(0.48, fanInnerColorPrefix + (innerAlpha * 0.88) + ")")
+            const fadeEnd = Math.max(0.56, Math.min(1, outerRadius / fixedRadius))
+            const fadeShoulder = Math.max(0.50, fadeEnd - 0.08)
+            gradient.addColorStop(fadeShoulder,
+                fanOuterColorPrefix + (innerAlpha * 0.28) + ")")
+            gradient.addColorStop(fadeEnd, fanOuterColorPrefix + "0)")
+            return gradient
+        }
 
         MouseArea {
             anchors.fill: parent
@@ -80,23 +107,6 @@ PanelWindow {
                 // then shed opacity quickly beyond it so the outer fan still
                 // reads as translucent rather than as a dark slab.
                 const fanInnerAlpha = Math.min(0.72, fanAlpha * 3.0)
-                // Let the surface approach transparency at its outer reach;
-                // an opaque tail reads as a hard cut even without an outline.
-                const fanOuterAlpha = 0
-                const fanInnerColor = "rgba("
-                    + Math.round((Theme.surface.r * 0.62 + Theme.primary.r * 0.30
-                        + Theme.tertiary.r * 0.08) * 255) + ","
-                    + Math.round((Theme.surface.g * 0.62 + Theme.primary.g * 0.30
-                        + Theme.tertiary.g * 0.08) * 255) + ","
-                    + Math.round((Theme.surface.b * 0.62 + Theme.primary.b * 0.30
-                        + Theme.tertiary.b * 0.08) * 255) + ","
-                const fanOuterColor = "rgba("
-                    + Math.round((Theme.surface.r * 0.68 + Theme.secondary.r * 0.24
-                        + Theme.primary.r * 0.08) * 255) + ","
-                    + Math.round((Theme.surface.g * 0.68 + Theme.secondary.g * 0.24
-                        + Theme.primary.g * 0.08) * 255) + ","
-                    + Math.round((Theme.surface.b * 0.68 + Theme.secondary.b * 0.24
-                        + Theme.primary.b * 0.08) * 255) + ","
                 // Keep the color field fixed in screen space. Using each
                 // current band radius as the gradient endpoint changed the
                 // alpha at every existing pixel whenever hierarchy geometry
@@ -104,27 +114,14 @@ PanelWindow {
                 const fixedGradientRadius = Math.max(900,
                     outerRadius, parentRing.capturedOuterRadius
                         + parentRing.capturedOuterItemHeight * 0.82)
-                function fanGradient() {
-                    const gradient = ctx.createRadialGradient(centerX, centerY, 0,
-                        centerX, centerY, fixedGradientRadius)
-                    gradient.addColorStop(0, fanInnerColor + fanInnerAlpha + ")")
-                    gradient.addColorStop(0.48, fanInnerColor + (fanInnerAlpha * 0.88) + ")")
-                    // Fade to zero at the real fan edge instead of clipping a
-                    // still-visible fixed colour field at any hierarchy depth.
-                    const fadeEnd = Math.max(0.56, Math.min(1,
-                        outerRadius / fixedGradientRadius))
-                    const fadeShoulder = Math.max(0.50, fadeEnd - 0.08)
-                    gradient.addColorStop(fadeShoulder,
-                        fanOuterColor + (fanInnerAlpha * 0.28) + ")")
-                    gradient.addColorStop(fadeEnd, fanOuterColor + fanOuterAlpha + ")")
-                    return gradient
-                }
+                const fillGradient = content.fanGradient(ctx, centerX, centerY,
+                    fixedGradientRadius, outerRadius, fanInnerAlpha)
 
                 // During root <-> child transitions, growingBand owns the
                 // complete surface. Leaving this canvas empty prevents two
                 // translucent layers from accumulating during either handoff.
                 if (!returningToRoot && !growingRootBand) {
-                    ctx.fillStyle = fanGradient()
+                    ctx.fillStyle = fillGradient
                     ctx.beginPath()
                     ctx.moveTo(centerX, centerY)
                     ctx.arc(centerX, centerY, innerRadius, start, end)
@@ -133,7 +130,7 @@ PanelWindow {
                 }
 
                 if (!growingRootBand && !returningToRoot) {
-                    ctx.fillStyle = fanGradient()
+                    ctx.fillStyle = fillGradient
                     ctx.beginPath()
                     ctx.arc(centerX, centerY, outerRadius, start, end)
                     ctx.arc(centerX, centerY, innerRadius, end, start, true)
@@ -145,7 +142,6 @@ PanelWindow {
             }
             Connections {
                 target: Theme
-                function onOutlineChanged() { guideCanvas.requestPaint() }
                 function onSurfaceChanged() { guideCanvas.requestPaint() }
                 function onPrimaryChanged() { guideCanvas.requestPaint() }
                 function onSecondaryChanged() { guideCanvas.requestPaint() }
@@ -215,42 +211,14 @@ PanelWindow {
                     ? window.launcherState.childRevealProgress
                     : window.launcherState.bandCollapseActive
                         ? window.launcherState.bandCollapseProgress : 0
-                const outer = growingRootBand
-                    ? parentOuter + (childOuter - parentOuter) * progress
-                    : parentOuter + (childOuter - parentOuter) * progress
+                const outer = parentOuter + (childOuter - parentOuter) * progress
                 const fanAlpha = Config.profileValue(window.launcherState.profile, "opacity", "fan", Config.fanOpacity)
                 const fanInnerAlpha = Math.min(0.72, fanAlpha * 3.0)
-                const fanOuterAlpha = 0
-                const fanInnerColor = "rgba("
-                    + Math.round((Theme.surface.r * 0.62 + Theme.primary.r * 0.30
-                        + Theme.tertiary.r * 0.08) * 255) + ","
-                    + Math.round((Theme.surface.g * 0.62 + Theme.primary.g * 0.30
-                        + Theme.tertiary.g * 0.08) * 255) + ","
-                    + Math.round((Theme.surface.b * 0.62 + Theme.primary.b * 0.30
-                        + Theme.tertiary.b * 0.08) * 255) + ","
-                const fanOuterColor = "rgba("
-                    + Math.round((Theme.surface.r * 0.68 + Theme.secondary.r * 0.24
-                        + Theme.primary.r * 0.08) * 255) + ","
-                    + Math.round((Theme.surface.g * 0.68 + Theme.secondary.g * 0.24
-                        + Theme.primary.g * 0.08) * 255) + ","
-                    + Math.round((Theme.surface.b * 0.68 + Theme.secondary.b * 0.24
-                        + Theme.primary.b * 0.08) * 255) + ","
                 // Match guideCanvas exactly: geometry changes, while the
                 // underlying color/alpha field remains fixed in screen space.
                 const fixedGradientRadius = Math.max(900, childOuter, parentOuter)
-                const gradient = ctx.createRadialGradient(centerX, centerY, 0,
-                    centerX, centerY, fixedGradientRadius)
-                gradient.addColorStop(0, fanInnerColor + fanInnerAlpha + ")")
-                gradient.addColorStop(0.48, fanInnerColor + (fanInnerAlpha * 0.88) + ")")
-                // Tie the transparent endpoint to the animated outer edge.
-                // `outer` already interpolates in both directions, so the
-                // gradient remains continuous throughout root/child changes.
-                const fadeEnd = Math.max(0.56, Math.min(1,
-                    outer / fixedGradientRadius))
-                const fadeShoulder = Math.max(0.50, fadeEnd - 0.08)
-                gradient.addColorStop(fadeShoulder,
-                    fanOuterColor + (fanInnerAlpha * 0.28) + ")")
-                gradient.addColorStop(fadeEnd, fanOuterColor + fanOuterAlpha + ")")
+                const gradient = content.fanGradient(ctx, centerX, centerY,
+                    fixedGradientRadius, outer, fanInnerAlpha)
                 // Geometry alone reveals or collapses the surface. An opacity
                 // fade would change its color during the handoff.
                 ctx.globalAlpha = 1
@@ -534,8 +502,6 @@ PanelWindow {
             }
             Connections {
                 target: Theme
-                function onOutlineChanged() { guidesCanvas.requestPaint() }
-                function onPrimaryChanged() { guidesCanvas.requestPaint() }
                 function onSecondaryChanged() { guidesCanvas.requestPaint() }
             }
             Connections {

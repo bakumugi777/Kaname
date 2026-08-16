@@ -30,11 +30,9 @@ QtObject {
     property int selectedIndex: 0
     property int rotationIndex: 0
     readonly property var currentItem: items.length && selectedIndex >= 0 && selectedIndex < items.length ? items[selectedIndex] : null
-    property int scrollIndex: 0
     property bool searchMode: false
     property string query: ""
     property int savedIndex: 0
-    property int visibleItems: Config.visibleItems
     property int closeAnimationMs: Config.motionDuration(Math.max(300, Config.animationMs * 2))
     property var navigationStack: []
     property bool providerAwaiting: false
@@ -79,6 +77,12 @@ QtObject {
     signal parentReturnHandoffStarting()
 
     property FileView resultFile: FileView { atomicWrites: true }
+
+    function navigationLocked() {
+        return menuEntryPending || parentTransferActive || parentTransferHandoffActive
+            || childRevealActive || childDismissActive || bandCollapseActive
+            || parentReturnActive
+    }
 
     function parseLineCandidates(candidateText, request) {
         const lines = candidateText.split("\n")
@@ -203,7 +207,6 @@ QtObject {
         items = parsed
         selectedIndex = 0
         rotationIndex = 0
-        scrollIndex = Math.floor(Math.min(visibleItems, parsed.length) / 2)
         query = ""
         searchMode = false
         show()
@@ -270,7 +273,6 @@ QtObject {
         items = allItems
         selectedIndex = 0
         rotationIndex = 0
-        scrollIndex = Math.floor(Math.min(visibleItems, items.length) / 2)
     }
 
     function enterMenu(newPrompt, newItems) {
@@ -444,7 +446,7 @@ QtObject {
     }
 
     function goBack() {
-        if (parentTransferActive || parentTransferHandoffActive || menuEntryPending || childRevealActive || childDismissActive || bandCollapseActive || parentReturnActive) return true
+        if (navigationLocked()) return true
         if (searchMode) { endSearch(); return true }
         if (!navigationStack.length) return false
         pendingBack = navigationStack[navigationStack.length - 1]
@@ -466,7 +468,7 @@ QtObject {
     }
 
     function move(delta) {
-        if (parentTransferActive || parentTransferHandoffActive || menuEntryPending || childRevealActive || childDismissActive || bandCollapseActive || parentReturnActive) return
+        if (navigationLocked()) return
         if (!items.length) return
         const nextIndex = (selectedIndex + delta + items.length) % items.length
         selectedIndex = nextIndex
@@ -477,7 +479,6 @@ QtObject {
             // wrapped selected index makes 10 -> 1 reset 9 -> 0 and forces
             // edge delegates to animate straight through the fan.
             rotationIndex += delta
-            scrollIndex = selectedIndex
         }
     }
 
@@ -487,7 +488,6 @@ QtObject {
         items = needle.length ? allItems.filter(item => item.searchText.indexOf(needle) !== -1) : allItems
         selectedIndex = Math.min(selectedIndex, Math.max(0, items.length - 1))
         rotationIndex = items.length > 6 ? selectedIndex : 0
-        scrollIndex = items.length > visibleItems ? selectedIndex : Math.floor(items.length / 2)
     }
 
     function beginSearch() {
@@ -501,7 +501,6 @@ QtObject {
         items = allItems
         selectedIndex = Math.min(savedIndex, Math.max(0, items.length - 1))
         rotationIndex = items.length > 6 ? selectedIndex : 0
-        scrollIndex = items.length > visibleItems ? selectedIndex : Math.floor(items.length / 2)
     }
 
     function respond(status, value) {
@@ -524,9 +523,7 @@ QtObject {
     }
 
     function enterLevel() {
-        if (menuEntryPending || parentTransferActive || parentTransferHandoffActive || childRevealActive
-                || childDismissActive || bandCollapseActive || parentReturnActive)
-            return false
+        if (navigationLocked()) return false
         if (!items.length) return false
         const item = items[selectedIndex]
         if (!item || item.disabled) return false
@@ -537,7 +534,7 @@ QtObject {
     }
 
     function accept() {
-        if (menuEntryPending || parentTransferActive || parentTransferHandoffActive || childRevealActive || childDismissActive || bandCollapseActive || parentReturnActive) return
+        if (navigationLocked()) return
         if (!items.length) return
         const item = items[selectedIndex]
         if (item.disabled) return
@@ -573,7 +570,6 @@ QtObject {
                 selectedIndex = i
                 if (items.length > 6) {
                     rotationIndex = selectedIndex
-                    scrollIndex = i
                 }
                 accept()
                 return true
@@ -583,7 +579,7 @@ QtObject {
     }
 
     function focusFromPointer(index) {
-        if (parentTransferActive || parentTransferHandoffActive || menuEntryPending || childRevealActive || childDismissActive || bandCollapseActive || parentReturnActive) return
+        if (navigationLocked()) return
         if (index < 0 || index >= items.length) return
         selectedIndex = index
     }

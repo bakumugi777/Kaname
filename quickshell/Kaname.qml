@@ -85,9 +85,26 @@ Scope {
                            request.outputMode, request.screen)
     }
 
+    property var buildRequest: function(requestId, candidatesPath, promptPath, resultPath,
+                                        profile, inputFormat, outputMode, screen) {
+        return {
+            requestId: requestId, candidatesPath: candidatesPath,
+            promptPath: promptPath, resultPath: resultPath, profile: profile,
+            inputFormat: inputFormat || "lines", outputMode: outputMode || "raw",
+            screen: screen
+        }
+    }
+
     function cacheApplications(entries) {
         applicationsCache = desktopSource.categorizedItems(entries)
         applicationsCacheReady = true
+    }
+
+    function populateApplicationsCache() {
+        const entries = desktopSource.items()
+        if (!entries.length) return false
+        cacheApplications(entries)
+        return true
     }
 
     function invalidateApplicationsCache() {
@@ -99,9 +116,7 @@ Scope {
 
     function warmApplicationsCache() {
         if (applicationsCacheReady) return
-        const entries = desktopSource.items()
-        if (entries.length) {
-            cacheApplications(entries)
+        if (populateApplicationsCache()) {
             applicationsWarmupAttempts = 0
             return
         }
@@ -110,12 +125,7 @@ Scope {
 
     function cachedApplications() {
         if (applicationsCacheReady) return applicationsCache
-        const entries = desktopSource.items()
-        if (entries.length) {
-            cacheApplications(entries)
-            return applicationsCache
-        }
-        return []
+        return populateApplicationsCache() ? applicationsCache : []
     }
 
     function tryShowApplications() {
@@ -133,9 +143,7 @@ Scope {
         }
         // Enumerate once per readiness attempt. Previously categorizedItems()
         // and items() each traversed and sorted the complete desktop database.
-        const entries = desktopSource.items()
-        if (entries.length) {
-            cacheApplications(entries)
+        if (populateApplicationsCache()) {
             tryShowApplications()
             return
         }
@@ -165,26 +173,20 @@ Scope {
         target: "kaname"
 
         function openRequest(requestId: string, candidatesPath: string, promptPath: string, resultPath: string, profile: string, inputFormat: string, outputMode: string, screen: string): void {
+            const request = root.buildRequest(requestId, candidatesPath, promptPath,
+                resultPath, profile, inputFormat, outputMode, screen)
             if (root.launcherState.active) {
                 // A completed dmenu request clears requestId before its close
                 // animation finishes. Queue the next sequential request then.
                 if (root.launcherState.mode === "dmenu" && !root.launcherState.requestId && !root.pendingRequest) {
-                    root.pendingRequest = {
-                        requestId: requestId, candidatesPath: candidatesPath, promptPath: promptPath,
-                        resultPath: resultPath, profile: profile, inputFormat: inputFormat || "lines",
-                        outputMode: outputMode || "raw", screen: screen
-                    }
+                    root.pendingRequest = request
                     return
                 }
                 busyFile.path = resultPath
                 busyFile.setText("busy\n")
                 return
             }
-            root.activateRequest({
-                requestId: requestId, candidatesPath: candidatesPath, promptPath: promptPath,
-                resultPath: resultPath, profile: profile, inputFormat: inputFormat || "lines",
-                outputMode: outputMode || "raw", screen: screen
-            })
+            root.activateRequest(request)
         }
 
         function close(): void { root.launcherState.cancel() }

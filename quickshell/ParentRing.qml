@@ -84,12 +84,16 @@ Item {
     // Keep return endpoints identical to FanLayout.circularOffset(). Using
     // index - selectedIndex directly diverges at wrapped edges and whenever a
     // small fixed list keeps rotationIndex at zero.
-    function capturedLogicalOffset(index, count) {
+    function logicalOffset(index, rotationIndex, count) {
         if (count <= 1) return 0
-        let offset = (index - capturedOuterRotationIndex) % count
+        let offset = (index - rotationIndex) % count
         if (offset > count / 2) offset -= count
         if (offset < -count / 2) offset += count
         return offset
+    }
+
+    function capturedLogicalOffset(index, count) {
+        return logicalOffset(index, capturedOuterRotationIndex, count)
     }
 
     function itemIndexForSlot(slot, count, rotationIndex) {
@@ -99,10 +103,7 @@ Item {
 
     function slotForItemIndex(index, count, rotationIndex) {
         if (count < 7) return index
-        let offset = (index - rotationIndex) % count
-        if (offset > count / 2) offset -= count
-        if (offset < -count / 2) offset += count
-        return offset + 3
+        return logicalOffset(index, rotationIndex, count) + 3
     }
 
     function transferEntries(count, sourceRotationIndex, destinationRotationIndex) {
@@ -153,9 +154,7 @@ Item {
 
     function minimallyVisibleRotation(sourceRotationIndex, selectedIndex, count) {
         if (count < 7) return sourceRotationIndex
-        let offset = (selectedIndex - sourceRotationIndex) % count
-        if (offset > count / 2) offset -= count
-        if (offset < -count / 2) offset += count
+        const offset = logicalOffset(selectedIndex, sourceRotationIndex, count)
         if (offset > 2) return sourceRotationIndex + offset - 2
         if (offset < -2) return sourceRotationIndex + offset + 2
         return sourceRotationIndex
@@ -215,17 +214,6 @@ Item {
                 width: item.width, height: item.height }
         }
         returnSourcePositions = positions
-    }
-
-    // Read the rendered position of the card that owns the current child
-    // level. This deliberately follows the return animation; a captured
-    // start position is already stale as soon as the parent begins moving.
-    function selectedReturnCenter() {
-        const index = displaySelectedParent
-        const slot = index >= 0
-            ? slotForItemIndex(index, displayItems.length, displayRotationIndex) : -1
-        const item = slot >= 0 ? parentRepeater.itemAt(slot) : null
-        return item ? { centerX: item.x + item.width / 2, centerY: item.y + item.height / 2 } : null
     }
 
     function captureExitLayer() {
@@ -461,18 +449,10 @@ Item {
             readonly property int transferIndex: root.transferLevel ? root.transferLevel.selectedIndex : 0
             readonly property int itemCount: root.transferLevel ? root.transferLevel.items.length : 0
             readonly property int itemIndex: transferEntry.itemIndex
-            readonly property real logicalOffset: {
-                let offset = (itemIndex - root.capturedOuterRotationIndex) % itemCount
-                if (itemCount > 1 && offset > itemCount / 2) offset -= itemCount
-                if (itemCount > 1 && offset < -itemCount / 2) offset += itemCount
-                return offset
-            }
-            readonly property real destinationOffset: {
-                let offset = (itemIndex - root.transferDestinationRotationIndex) % itemCount
-                if (itemCount > 1 && offset > itemCount / 2) offset -= itemCount
-                if (itemCount > 1 && offset < -itemCount / 2) offset += itemCount
-                return offset
-            }
+            readonly property real logicalOffset: root.logicalOffset(itemIndex,
+                root.capturedOuterRotationIndex, itemCount)
+            readonly property real destinationOffset: root.logicalOffset(itemIndex,
+                root.transferDestinationRotationIndex, itemCount)
             readonly property bool sourceVisible: transferEntry.sourceVisible
             readonly property bool destinationVisible: transferEntry.destinationVisible
             readonly property int rotationDelta: root.transferDestinationRotationIndex
@@ -481,7 +461,6 @@ Item {
                 ? (rotationDelta < 0 ? -4 : 4) : logicalOffset
             readonly property real syntheticDestinationOffset: transferEntry.wrapRole === "out"
                 ? (rotationDelta < 0 ? 4 : -4) : destinationOffset
-            readonly property real sourceAngle: root.capturedOuterSelectedAngle + logicalOffset * root.capturedOuterAngleStep
             readonly property real syntheticSourceAngle: root.capturedOuterSelectedAngle
                 + syntheticSourceOffset * root.capturedOuterAngleStep
             readonly property real destinationAngle: transferEntry.wrapRole === "out"

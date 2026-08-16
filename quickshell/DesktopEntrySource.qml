@@ -145,9 +145,8 @@ QtObject {
         }
 
         const result = []
-        // All Applications is the primary entry point. Keeping it at index 0
-        // also makes LauncherState's normal initial selection focus it without
-        // a mode-specific selection override.
+        // Build All Applications first; the enabled Recently Used entry is
+        // inserted ahead of it below and receives the normal initial focus.
         const allConfig = Config.applicationMenu && Config.applicationMenu.all
             ? Config.applicationMenu.all : ({})
         if (allConfig.enabled !== false) {
@@ -186,7 +185,10 @@ QtObject {
                 icon: "document-open-recent", image: "", isImage: false,
                 value: "", key: "", disabled: true, searchText: "no recent applications"
             }]
-            result.push({
+            // Recent applications are the primary entry point. Insert this
+            // before the already-created All Applications item while keeping
+            // every configured category in its existing order.
+            result.unshift({
                 id: "applications-" + recentId, type: "submenu", label: recentLabel,
                 description: categoryDescription(recentApplications.length),
                 icon: typeof recentConfig.icon === "string"
