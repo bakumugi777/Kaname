@@ -76,8 +76,10 @@ fi
 
 if ((install_config)); then
   package_path=$(nix build --no-link --print-out-paths "$flake_target")
-  config_dir=${XDG_CONFIG_HOME:-"$HOME/.config"}/kaname
-  mkdir -p "$config_dir"
+  xdg_config_dir=${XDG_CONFIG_HOME:-"$HOME/.config"}
+  config_dir=$xdg_config_dir/kaname
+  matugen_template_dir=$xdg_config_dir/matugen/templates
+  mkdir -p "$config_dir" "$matugen_template_dir"
 
   install_one() {
     local source_file=$1
@@ -106,7 +108,7 @@ if ((install_config)); then
   install_one "$package_path/share/kaname/config/menus.json" \
     "$config_dir/menus.json"
   install_one "$package_path/share/kaname/matugen/kaname-colors.json.template" \
-    "$config_dir/kaname-colors.json.template"
+    "$matugen_template_dir/kaname-colors.json"
 fi
 
 cat <<'EOF'

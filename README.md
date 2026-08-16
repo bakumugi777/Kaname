@@ -323,8 +323,61 @@ cp "$(nix build --no-link --print-out-paths github:OWNER/kaname#kaname)/share/ka
 Home Manager moduleを使う場合、ファイルはNix storeへのシンボリックリンクになります。
 直接編集せず、`programs.kaname.settings`と`programs.kaname.menus`を変更してください。
 
+Home Manager moduleで指定できる最上位optionは次のとおりです。
+
+- `enable`: Kanameを導入する
+- `package`: 使用するKanameパッケージ
+- `autostart`: systemdユーザーサービスを有効にする（既定は`false`）
+- `matugen.enable`: matugenテンプレートを配置する（既定は`true`）
+- `settings`: `config.json`へ出力する設定
+- `menus`: `menus.json`へ出力するメニュー
+
+`settings`と`menus`は同梱の既定値へ再帰的にマージされる自由形式のJSON属性です。
+配列を指定した場合は、その配列全体を置き換えます。例えば次のように設定できます。
+
+```nix
+programs.kaname = {
+  enable = true;
+
+  settings = {
+    geometry = {
+      visibleItems = 7;
+      radius = 760;
+    };
+    opacity = {
+      background = 0.72;
+      item = 0.92;
+    };
+    behavior = {
+      animationMs = 180;
+      reducedMotion = false;
+      keyBindings = {
+        enterLevel = "Left";
+        backLevel = "Right";
+      };
+    };
+    theme.preset = "matugen";
+    display.screen = "";
+  };
+
+  menus.menus.main = {
+    label = "Kaname";
+    items = [
+      {
+        id = "terminal";
+        type = "command";
+        label = "Terminal";
+        icon = "utilities-terminal";
+        command = [ "foot" ];
+      }
+    ];
+  };
+};
+```
+
 詳しいフィールド、メニュー例、JSON Lines、matugenテンプレートについては
-[日本語設定ガイド](docs/CONFIGURATION.ja.txt)を参照してください。
+[日本語設定ガイド](docs/CONFIGURATION.ja.txt)と
+[`config/default.json`](config/default.json)を参照してください。
 
 ## matugen連携
 
@@ -345,15 +398,56 @@ Kanameはファイルを監視し、正常なJSONへの更新をQuickshellの再
 既存のpywal設定には干渉しません。詳しいスキーマとテンプレート例は
 [日本語設定ガイド](docs/CONFIGURATION.ja.txt)の「matugenテーマJSON」を参照してください。
 
-Home Manager moduleはテンプレートだけを配置し、既存の
-`~/.config/matugen/config.toml`は上書きしません。システムのmatugen実行でKanameの色も
-生成する場合は、既存のmatugen設定へ次を追加してください。
+### Home Managerでmatugenを使う
+
+Home Manager moduleが自動配置するのは、次の**入力テンプレート**です。
+
+```text
+~/.config/matugen/templates/kaname-colors.json
+```
+
+Kanameが実際に読むのは、matugenがテンプレートから生成する次の**出力JSON**です。
+
+```text
+~/.cache/matugen/kaname-colors.json
+```
+
+moduleは既存の`~/.config/matugen/config.toml`を上書きしません。そのファイルを別の
+Home Manager設定で管理している場合に、複数の定義が同じファイルを所有して衝突するのを
+避けるためです。既存の`xdg.configFile."matugen/config.toml".text`へ次を追加してください。
+
+```nix
+{ config, ... }:
+{
+  xdg.configFile."matugen/config.toml".text = ''
+    # 既存の[config]と[templates.*]はそのまま残す
+
+    [templates.kaname]
+    input_path = "${config.xdg.configHome}/matugen/templates/kaname-colors.json"
+    output_path = "${config.xdg.cacheHome}/matugen/kaname-colors.json"
+  '';
+}
+```
+
+`config.toml`を手動管理している場合は、代わりに次のTOMLを追加します。
 
 ```toml
 [templates.kaname]
 input_path = "~/.config/matugen/templates/kaname-colors.json"
 output_path = "~/.cache/matugen/kaname-colors.json"
 ```
+
+Home Managerを反映した後、普段壁紙変更時に使っているmatugen処理を一度実行してください。
+テンプレートの配置だけでは出力JSONは作られません。確認方法:
+
+```bash
+ls -l ~/.config/matugen/templates/kaname-colors.json
+jq . ~/.cache/matugen/kaname-colors.json
+```
+
+1つ目だけ存在して2つ目が存在しない場合は、matugenがまだ実行されていないか、
+`[templates.kaname]`が読み込まれていません。2つ目が正常なJSONなら、Kanameはその更新を
+監視し、Quickshellを再起動せずに色を反映します。
 
 ## アイコンテーマ
 

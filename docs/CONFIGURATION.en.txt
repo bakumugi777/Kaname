@@ -26,13 +26,28 @@ No manual copy is needed when using the flake's Home Manager module:
 Put setting overrides in programs.kaname.settings and menu overrides in
 programs.kaname.menus. The generated JSON files are Nix store links and should
 not be edited directly.
+The top-level module options are enable, package, autostart, matugen.enable,
+settings, and menus. Inside settings and menus, write the JSON keys documented
+in this guide as ordinary Nix attributes. Example:
+
+  programs.kaname.settings = {
+    geometry.visibleItems = 7;
+    opacity.background = 0.72;
+    behavior.animationMs = 180;
+    theme.preset = "matugen";
+  };
+
+Unspecified attributes retain their bundled defaults. Defining an array
+replaces that complete array.
 
 Without Home Manager, install initial copies with:
 
   mkdir -p ~/.config/kaname
   cp config/default.json ~/.config/kaname/config.json
   cp config/menus.json ~/.config/kaname/menus.json
-  cp matugen/kaname-colors.json.template ~/.config/kaname/
+  mkdir -p ~/.config/matugen/templates
+  cp matugen/kaname-colors.json.template \
+    ~/.config/matugen/templates/kaname-colors.json
 
 config.json and menus.json are watched at runtime. Saving valid JSON normally
 applies changes without restarting Quickshell. Invalid updates leave the last
@@ -507,13 +522,13 @@ Kaname retains the last valid palette when a broken theme update is detected.
 
 Install the matugen template at:
 
-  ~/.config/kaname/kaname-colors.json.template
+  ~/.config/matugen/templates/kaname-colors.json
 
 To use the copy supplied by this repository:
 
-  mkdir -p ~/.config/kaname
+  mkdir -p ~/.config/matugen/templates
   cp matugen/kaname-colors.json.template \
-    ~/.config/kaname/kaname-colors.json.template
+    ~/.config/matugen/templates/kaname-colors.json
 
 Complete template example:
 
@@ -542,21 +557,15 @@ defaults.
     "text": "{{colors.on_background.default.hex}}"
   }
 
-The integration apply-wallpaper.sh passes this template to matugen and
-atomically installs the generated result at:
+Register this template in matugen's config.toml. A normal matugen run then
+writes the generated result to:
 
   ~/.cache/matugen/kaname-colors.json
 
 Kaname watches that destination and updates its colors without restarting
-Quickshell when a valid JSON file replaces it. Override the template and output
-paths with:
-
-  KANAME_TEMPLATE=/path/to/template.json
-  KANAME_THEME_FILE=/path/to/generated-colors.json
-
-Pass the same KANAME_THEME_FILE value to apply-wallpaper.sh and to the
-Quickshell process running Kaname. If the template is absent, no new Kaname JSON
-is generated. An existing JSON keeps its previous colors; with no JSON, Kaname
+Quickshell when a valid JSON file replaces it. To change the output path, pass
+KANAME_THEME_FILE=/path/to/generated-colors.json to the Quickshell process
+running Kaname. If no generated JSON exists, Kaname
 uses its built-in palette.
 
 

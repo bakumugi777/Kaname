@@ -25,13 +25,28 @@ flakeのHome Manager moduleを使う場合は、初期ファイルの手動コ�
 
 設定変更はprograms.kaname.settings、メニュー変更はprograms.kaname.menusへ記述します。
 生成されたJSONはNix storeへのリンクなので、直接編集しないでください。
+moduleの最上位optionはenable、package、autostart、matugen.enable、settings、menusです。
+settingsとmenusの内部では、この文書に記載されたJSONのキーをNixの属性としてそのまま
+記述できます。例:
+
+  programs.kaname.settings = {
+    geometry.visibleItems = 7;
+    opacity.background = 0.72;
+    behavior.animationMs = 180;
+    theme.preset = "matugen";
+  };
+
+指定していない属性には同梱の既定値が使われます。配列を指定すると、その配列全体を
+置き換えます。
 
 Home Managerを使わない場合は、初期ファイルを次のように配置できます。
 
   mkdir -p ~/.config/kaname
   cp config/default.json ~/.config/kaname/config.json
   cp config/menus.json ~/.config/kaname/menus.json
-  cp matugen/kaname-colors.json.template ~/.config/kaname/
+  mkdir -p ~/.config/matugen/templates
+  cp matugen/kaname-colors.json.template \
+    ~/.config/matugen/templates/kaname-colors.json
 
 config.jsonとmenus.jsonは実行中に監視されます。正しいJSONへ保存すると、通常は
 Quickshellの再起動なしで反映されます。JSONが壊れている場合は直前の有効な設定を
@@ -498,13 +513,13 @@ childrenは同じ項目形式の配列で、任意の深さにネストできま
 
 matugenテンプレートは次の場所へ配置します。
 
-  ~/.config/kaname/kaname-colors.json.template
+  ~/.config/matugen/templates/kaname-colors.json
 
 リポジトリ同梱版を使う場合:
 
-  mkdir -p ~/.config/kaname
+  mkdir -p ~/.config/matugen/templates
   cp matugen/kaname-colors.json.template \
-    ~/.config/kaname/kaname-colors.json.template
+    ~/.config/matugen/templates/kaname-colors.json
 
 完全なテンプレート例:
 
@@ -532,21 +547,15 @@ matugenテンプレートは次の場所へ配置します。
     "text": "{{colors.on_background.default.hex}}"
   }
 
-連携用apply-wallpaper.shは、このテンプレートをmatugenへ渡し、生成結果を次へ
-アトミックに配置します。
+matugenのconfig.tomlへこのテンプレートを登録すると、通常のmatugen実行が生成結果を
+次へ配置します。
 
   ~/.cache/matugen/kaname-colors.json
 
 Kanameは生成先を監視しているため、正常なJSONへ置き換わるとQuickshellを再起動せず
-色を更新します。テンプレートまたは生成先を変更する場合は、それぞれ次の環境変数を
-使用します。
-
-  KANAME_TEMPLATE=/path/to/template.json
-  KANAME_THEME_FILE=/path/to/generated-colors.json
-
-KANAME_THEME_FILEはapply-wallpaper.shと、Kanameを起動するQuickshellプロセスの
-両方へ同じ値を渡してください。テンプレートが存在しない場合は新しいKaname用JSONを
-生成せず、既存JSONがあればその色を維持し、なければKaname内蔵色を使用します。
+色を更新します。生成先を変更する場合は、Kanameを起動するQuickshellプロセスへ
+KANAME_THEME_FILE=/path/to/generated-colors.jsonを渡してください。生成JSONが存在しない
+場合はKaname内蔵色を使用します。
 
 
 7. 優先順位とトラブルシューティング

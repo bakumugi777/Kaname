@@ -6,6 +6,8 @@ let
   jsonFormat = pkgs.formats.json { };
   defaultSettings = builtins.fromJSON (builtins.readFile ../config/default.json);
   defaultMenus = builtins.fromJSON (builtins.readFile ../config/menus.json);
+  effectiveSettings = lib.recursiveUpdate defaultSettings cfg.settings;
+  effectiveMenus = lib.recursiveUpdate defaultMenus cfg.menus;
 in
 {
   options.programs.kaname = {
@@ -21,19 +23,19 @@ in
 
     settings = lib.mkOption {
       type = jsonFormat.type;
-      default = defaultSettings;
+      default = { };
       description = ''
-        Contents of Kaname's config.json. Attribute definitions are merged with
-        the bundled defaults, so only values that differ need to be specified.
+        Overrides for Kaname's config.json. They are recursively merged with the
+        bundled defaults, so only values that differ need to be specified.
       '';
     };
 
     menus = lib.mkOption {
       type = jsonFormat.type;
-      default = defaultMenus;
+      default = { };
       description = ''
-        Contents of Kaname's menus.json. Attribute definitions are merged with
-        the bundled defaults.
+        Overrides for Kaname's menus.json. They are recursively merged with the
+        bundled defaults.
       '';
     };
 
@@ -62,12 +64,10 @@ in
 
     xdg.configFile = {
       "kaname/config.json".source =
-        jsonFormat.generate "kaname-config.json" cfg.settings;
+        jsonFormat.generate "kaname-config.json" effectiveSettings;
       "kaname/menus.json".source =
-        jsonFormat.generate "kaname-menus.json" cfg.menus;
+        jsonFormat.generate "kaname-menus.json" effectiveMenus;
     } // lib.optionalAttrs cfg.matugen.enable {
-      "kaname/kaname-colors.json.template".source =
-        "${cfg.package}/share/kaname/matugen/kaname-colors.json.template";
       "matugen/templates/kaname-colors.json".source =
         "${cfg.package}/share/kaname/matugen/kaname-colors.json.template";
     };

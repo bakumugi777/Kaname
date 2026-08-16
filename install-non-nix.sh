@@ -95,8 +95,10 @@ ln -sfn -- "../lib/kaname/bin/kaname" "$bin_dir/kaname"
 ln -sfn -- "../lib/kaname/bin/kaname-shell" "$bin_dir/kaname-shell"
 
 if ((install_config)); then
-  config_dir=${XDG_CONFIG_HOME:-"$HOME/.config"}/kaname
-  mkdir -p "$config_dir"
+  xdg_config_dir=${XDG_CONFIG_HOME:-"$HOME/.config"}
+  config_dir=$xdg_config_dir/kaname
+  matugen_template_dir=$xdg_config_dir/matugen/templates
+  mkdir -p "$config_dir" "$matugen_template_dir"
 
   install_one() {
     local source_file=$1
@@ -123,7 +125,7 @@ if ((install_config)); then
   install_one "$install_root/config/default.json" "$config_dir/config.json"
   install_one "$install_root/config/menus.json" "$config_dir/menus.json"
   install_one "$install_root/matugen/kaname-colors.json.template" \
-    "$config_dir/kaname-colors.json.template"
+    "$matugen_template_dir/kaname-colors.json"
 fi
 
 cat <<EOF
