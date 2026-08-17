@@ -32,19 +32,19 @@ PanelWindow {
         property real fanDisplayMix: 0.24
         readonly property real darkFanOpacity: 1 - fanDisplayMix * 0.35
         readonly property string fanInnerColorPrefix: "rgba("
-            + Math.round((Theme.surface.r * 0.62 + Theme.primary.r * 0.30
-                + Theme.tertiary.r * 0.08) * 255) + ","
-            + Math.round((Theme.surface.g * 0.62 + Theme.primary.g * 0.30
-                + Theme.tertiary.g * 0.08) * 255) + ","
-            + Math.round((Theme.surface.b * 0.62 + Theme.primary.b * 0.30
-                + Theme.tertiary.b * 0.08) * 255) + ","
+            + Math.round((Theme.surface.r * 0.46 + Theme.primary.r * 0.42
+                + Theme.tertiary.r * 0.12) * 255) + ","
+            + Math.round((Theme.surface.g * 0.46 + Theme.primary.g * 0.42
+                + Theme.tertiary.g * 0.12) * 255) + ","
+            + Math.round((Theme.surface.b * 0.46 + Theme.primary.b * 0.42
+                + Theme.tertiary.b * 0.12) * 255) + ","
         readonly property string fanOuterColorPrefix: "rgba("
-            + Math.round((Theme.surface.r * 0.68 + Theme.secondary.r * 0.24
-                + Theme.primary.r * 0.08) * 255) + ","
-            + Math.round((Theme.surface.g * 0.68 + Theme.secondary.g * 0.24
-                + Theme.primary.g * 0.08) * 255) + ","
-            + Math.round((Theme.surface.b * 0.68 + Theme.secondary.b * 0.24
-                + Theme.primary.b * 0.08) * 255) + ","
+            + Math.round((Theme.surface.r * 0.50 + Theme.secondary.r * 0.34
+                + Theme.primary.r * 0.16) * 255) + ","
+            + Math.round((Theme.surface.g * 0.50 + Theme.secondary.g * 0.34
+                + Theme.primary.g * 0.16) * 255) + ","
+            + Math.round((Theme.surface.b * 0.50 + Theme.secondary.b * 0.34
+                + Theme.primary.b * 0.16) * 255) + ","
 
         function fanGradient(ctx, centerX, centerY, fixedRadius, outerRadius, innerAlpha) {
             const gradient = ctx.createRadialGradient(centerX, centerY, 0,
@@ -298,9 +298,9 @@ PanelWindow {
                 }
 
                 const displayColor = Qt.rgba(
-                    Theme.surface.r * 0.22 + Theme.primary.r * 0.58 + Theme.tertiary.r * 0.20,
-                    Theme.surface.g * 0.22 + Theme.primary.g * 0.58 + Theme.tertiary.g * 0.20,
-                    Theme.surface.b * 0.22 + Theme.primary.b * 0.58 + Theme.tertiary.b * 0.20, 1)
+                    Theme.surface.r * 0.12 + Theme.primary.r * 0.65 + Theme.tertiary.r * 0.23,
+                    Theme.surface.g * 0.12 + Theme.primary.g * 0.65 + Theme.tertiary.g * 0.23,
+                    Theme.surface.b * 0.12 + Theme.primary.b * 0.65 + Theme.tertiary.b * 0.23, 1)
                 const fanAlpha = Config.profileValue(window.launcherState.profile,
                     "opacity", "fan", Config.fanOpacity)
                 const innerAlpha = Math.min(0.72, fanAlpha * 3.0)
@@ -402,12 +402,12 @@ PanelWindow {
                 const parentInner = parentRing.radius - 72
                 const fanAlpha = Config.profileValue(window.launcherState.profile,
                     "opacity", "fan", Config.fanOpacity)
-                const bandRed = Theme.surface.r * 0.30 + Theme.primary.r * 0.48
-                    + Theme.secondary.r * 0.22
-                const bandGreen = Theme.surface.g * 0.30 + Theme.primary.g * 0.48
-                    + Theme.secondary.g * 0.22
-                const bandBlue = Theme.surface.b * 0.30 + Theme.primary.b * 0.48
-                    + Theme.secondary.b * 0.22
+                const bandRed = Theme.surface.r * 0.20 + Theme.primary.r * 0.56
+                    + Theme.secondary.r * 0.24
+                const bandGreen = Theme.surface.g * 0.20 + Theme.primary.g * 0.56
+                    + Theme.secondary.g * 0.24
+                const bandBlue = Theme.surface.b * 0.20 + Theme.primary.b * 0.56
+                    + Theme.secondary.b * 0.24
                 // Parent hierarchy bands are accents, not another slice of
                 // the fan's radial gradient. A constant alpha keeps the band
                 // visually even from end to end.
