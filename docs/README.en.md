@@ -286,7 +286,7 @@ kaname (--dmenu [--jsonl] [--output raw|value|id|json]
 - `Enter`: activate or enter the selected child level
 - `Left`: enter a child level by default
 - `Right` / `Backspace`: return to the parent level
-- Text input: search
+- Text input: search every loaded level; results use the outer child band
 - `Escape`: clear search, or close the launcher when not searching
 - Mouse wheel: move selection
 - Click: select or activate

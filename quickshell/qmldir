@@ -9,5 +9,6 @@ ProviderRunner 1.0 ProviderRunner.qml
 ParentRing 1.0 ParentRing.qml
 FanItem 1.0 FanItem.qml
 FanLayout 1.0 FanLayout.qml
+SearchResultsLayout 1.0 SearchResultsLayout.qml
 LauncherState 1.0 LauncherState.qml
 LauncherWindow 1.0 LauncherWindow.qml

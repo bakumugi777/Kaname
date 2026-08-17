@@ -61,7 +61,10 @@ PanelWindow {
 
         MouseArea {
             anchors.fill: parent
-            onClicked: window.launcherState.cancel()
+            onClicked: {
+                if (!window.launcherState.navigationLocked())
+                    window.launcherState.cancel()
+            }
             onWheel: wheel => {
                 const delta = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.pixelDelta.y
                 if (delta !== 0) window.launcherState.move(delta > 0 ? 1 : -1)
@@ -191,6 +194,8 @@ PanelWindow {
                 || window.launcherState.bandCollapseActive
                 || (window.launcherState.parentReturnActive
                     && window.launcherState.navigationStack.length === 1)
+                || (window.launcherState.searchMode
+                    && window.launcherState.navigationStack.length === 0)
             z: -2
             opacity: content.darkFanOpacity
             onPaint: {
@@ -198,16 +203,25 @@ PanelWindow {
                 ctx.clearRect(0, 0, width, height)
                 const growingRootBand = window.launcherState.childRevealActive
                     && window.launcherState.navigationStack.length === 1
+                const growingSearchBand = window.launcherState.searchMode
+                    && window.launcherState.navigationStack.length === 0
                 if (!growingRootBand && !window.launcherState.bandCollapseActive
                     && !(window.launcherState.parentReturnActive
-                        && window.launcherState.navigationStack.length === 1)) return
+                        && window.launcherState.navigationStack.length === 1)
+                    && !growingSearchBand) return
                 const centerX = width + fanLayout.centerOffsetX
                 const centerY = height + fanLayout.centerOffsetY
                 const start = fanLayout.startAngle * Math.PI / 180
                 const end = fanLayout.endAngle * Math.PI / 180
-                const childOuter = fanLayout.radius + fanLayout.itemHeight * 0.82
-                const parentOuter = parentRing.capturedOuterRadius + parentRing.capturedOuterItemHeight * 0.82
-                const progress = growingRootBand
+                const childOuter = growingSearchBand
+                    ? searchResultsLayout.radius + searchResultsLayout.itemHeight * 0.82
+                    : fanLayout.radius + fanLayout.itemHeight * 0.82
+                const parentOuter = growingSearchBand
+                    ? fanLayout.radius + fanLayout.itemHeight * 0.82
+                    : parentRing.capturedOuterRadius + parentRing.capturedOuterItemHeight * 0.82
+                const progress = growingSearchBand
+                    ? window.launcherState.searchPresentation
+                    : growingRootBand
                     ? window.launcherState.childRevealProgress
                     : window.launcherState.bandCollapseActive
                         ? window.launcherState.bandCollapseProgress : 0
@@ -243,6 +257,8 @@ PanelWindow {
                 function onBandCollapseProgressChanged() { growingBand.requestPaint() }
                 function onBandCollapseActiveChanged() { growingBand.requestPaint() }
                 function onParentReturnActiveChanged() { growingBand.requestPaint() }
+                function onSearchPresentationChanged() { growingBand.requestPaint() }
+                function onSearchModeChanged() { growingBand.requestPaint() }
             }
             Connections {
                 target: Theme
@@ -592,6 +608,56 @@ PanelWindow {
             childRevealOrigin: parentRing.liveTransferOrigin
         }
 
+        SearchResultsLayout {
+            id: searchResultsLayout
+            anchors.fill: parent
+            state: window.launcherState
+        }
+
+        NumberAnimation {
+            target: window.launcherState
+            property: "searchPresentation"
+            to: 1
+            duration: Config.motionDuration(Math.max(150, Config.animationMs))
+            easing.type: Easing.OutCubic
+            running: window.launcherState.searchTransitionActive
+                && !window.launcherState.searchLeaving
+            onFinished: window.launcherState.finishSearchTransition()
+        }
+
+        NumberAnimation {
+            target: window.launcherState
+            property: "searchContentPresentation"
+            to: 0
+            duration: Config.motionDuration(55)
+            easing.type: Easing.InCubic
+            running: window.launcherState.searchContentAnimationActive
+                && window.launcherState.searchRefreshPhase === "out"
+            onFinished: window.launcherState.finishSearchContentFadeOut()
+        }
+
+        NumberAnimation {
+            target: window.launcherState
+            property: "searchContentPresentation"
+            to: 1
+            duration: Config.motionDuration(95)
+            easing.type: Easing.OutCubic
+            running: window.launcherState.searchContentAnimationActive
+                && window.launcherState.searchRefreshPhase === "in"
+            onFinished: window.launcherState.finishSearchContentAnimation()
+        }
+
+        NumberAnimation {
+            target: window.launcherState
+            property: "searchPresentation"
+            to: 0
+            duration: Config.motionDuration(Math.max(150, Config.animationMs))
+            easing.type: Easing.InCubic
+            running: window.launcherState.searchTransitionActive
+                && window.launcherState.searchLeaving
+            onFinished: window.launcherState.finishSearchTransition()
+        }
+
         NumberAnimation {
             target: window.launcherState
             property: "openingProgress"
@@ -657,6 +723,11 @@ PanelWindow {
             readonly property string selectedDescription: window.launcherState.currentItem
                 ? (window.launcherState.currentItem.description || "") : ""
             readonly property string selectedParentLabel: {
+                if (window.launcherState.searchMode) {
+                    const result = window.launcherState.currentItem
+                    return result && result.searchParentLabel
+                        ? String(result.searchParentLabel) : "Search results"
+                }
                 const stack = window.launcherState.navigationStack
                 if (!stack.length) return ""
                 const level = stack[stack.length - 1]
@@ -665,8 +736,9 @@ PanelWindow {
                 const parent = level.items[level.selectedIndex]
                 return parent && parent.label ? String(parent.label) : ""
             }
-            readonly property string selectedCount: window.launcherState.items.length
-                ? (window.launcherState.selectedIndex + 1) + "  /  " + window.launcherState.items.length
+            readonly property string selectedCount: window.launcherState.activeItems.length
+                ? (window.launcherState.activeSelectedIndex + 1) + "  /  "
+                    + window.launcherState.activeItems.length
                 : "0  /  0"
             property string displayedLabel: ""
             property string displayedDescription: ""
@@ -743,6 +815,9 @@ PanelWindow {
                 target: window.launcherState
                 function onSelectedIndexChanged() { hub.queueInfoUpdate() }
                 function onItemsChanged() { hub.queueInfoUpdate() }
+                function onSearchSelectedIndexChanged() { hub.queueInfoUpdate() }
+                function onSearchResultsChanged() { hub.queueInfoUpdate() }
+                function onSearchModeChanged() { hub.queueInfoUpdate() }
                 function onPromptChanged() { hub.queueInfoUpdate() }
                 function onNavigationStackChanged() { hub.queueInfoUpdate() }
                 function onPresentingChanged() { hub.queueInfoUpdate() }
@@ -911,7 +986,9 @@ PanelWindow {
                     }
                     MouseArea {
                         anchors.fill: parent
-                        onClicked: { window.launcherState.beginSearch(); searchInput.forceActiveFocus() }
+                        onClicked: {
+                            if (window.launcherState.beginSearch()) searchInput.forceActiveFocus()
+                        }
                         onWheel: wheel => {
                             const delta = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.pixelDelta.y
                             if (delta !== 0) window.launcherState.move(delta > 0 ? 1 : -1)
@@ -952,7 +1029,15 @@ PanelWindow {
         }
 
         Keys.onPressed: event => {
-            if (event.key === Qt.Key_Escape) {
+            if (window.launcherState.navigationLocked()) {
+                // Search dismissal may interrupt its lightweight presentation
+                // animation. Other hierarchy handoffs remain fully locked.
+                if (event.key === Qt.Key_Escape
+                        && window.launcherState.searchMode
+                        && !window.launcherState.searchLeaving)
+                    window.launcherState.endSearch()
+                event.accepted = true
+            } else if (event.key === Qt.Key_Escape) {
                 if (window.launcherState.searchMode) {
                     window.launcherState.endSearch()
                     // TextInput keeps active focus after it becomes read-only
@@ -977,7 +1062,8 @@ PanelWindow {
             } else if (event.key === Qt.Key_Down) {
                 window.launcherState.move(-1); event.accepted = true
             } else if (event.key === Qt.Key_Slash && !window.launcherState.searchMode) {
-                window.launcherState.beginSearch(); searchInput.forceActiveFocus(); event.accepted = true
+                if (window.launcherState.beginSearch()) searchInput.forceActiveFocus()
+                event.accepted = true
             } else if (event.key === Qt.Key_Backspace && !window.launcherState.searchMode) {
                 if (window.launcherState.goBack()) event.accepted = true
             } else if (window.launcherState.triggerKey(event.text)) {

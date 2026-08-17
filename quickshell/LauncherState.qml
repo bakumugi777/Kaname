@@ -29,7 +29,22 @@ QtObject {
     property var items: []
     property int selectedIndex: 0
     property int rotationIndex: 0
-    readonly property var currentItem: items.length && selectedIndex >= 0 && selectedIndex < items.length ? items[selectedIndex] : null
+    property var rootSearchItems: []
+    property var searchIndexItems: []
+    property var searchResults: []
+    property int searchSelectedIndex: 0
+    property int searchRotationIndex: 0
+    property real searchPresentation: 0
+    property bool searchTransitionActive: false
+    property bool searchLeaving: false
+    property real searchContentPresentation: 0
+    property bool searchContentAnimationActive: false
+    property string pendingSearchText: ""
+    property string searchRefreshPhase: ""
+    readonly property var activeItems: searchMode ? searchResults : items
+    readonly property int activeSelectedIndex: searchMode ? searchSelectedIndex : selectedIndex
+    readonly property var currentItem: activeItems.length && activeSelectedIndex >= 0
+        && activeSelectedIndex < activeItems.length ? activeItems[activeSelectedIndex] : null
     property bool searchMode: false
     property string query: ""
     property int savedIndex: 0
@@ -81,7 +96,9 @@ QtObject {
     function navigationLocked() {
         return menuEntryPending || parentTransferActive || parentTransferHandoffActive
             || childRevealActive || childDismissActive || bandCollapseActive
-            || parentReturnActive
+            || parentReturnActive || parentReturnHandoffActive
+            || parentReturnSettleActive || ancestorEnterActive
+            || ancestorEnterHandoffActive || searchTransitionActive
     }
 
     function parseLineCandidates(candidateText, request) {
@@ -146,6 +163,83 @@ QtObject {
         }
     }
 
+    function cloneSearchItem(item, pathLabels) {
+        const clone = ({})
+        for (const key in item) clone[key] = item[key]
+        clone.searchParentLabel = pathLabels.join(" / ")
+        clone.searchText = (String(item.searchText || "") + " "
+            + clone.searchParentLabel).toLowerCase()
+        return clone
+    }
+
+    function buildSearchIndex(sourceItems) {
+        const flattened = []
+        const positionsByKey = ({})
+        const roots = sourceItems || []
+        const hasApplicationCategories = roots.some(item => {
+            const id = String(item && item.id || "")
+            return Array.isArray(item && item.children) && item.children.length
+                && id.startsWith("applications-")
+                && !id.startsWith("applications-all")
+                && !id.startsWith("applications-recent")
+        })
+        function visit(levelItems, pathLabels, pathPenalty, depth) {
+            for (let i = 0; i < levelItems.length; ++i) {
+                const item = levelItems[i]
+                if (!item) continue
+                const children = Array.isArray(item.children) ? item.children : []
+                if (children.length) {
+                    const itemId = String(item.id || "")
+                    if (depth === 0 && hasApplicationCategories
+                            && (itemId.startsWith("applications-all")
+                                || itemId.startsWith("applications-recent"))) continue
+                    const nextPenalty = pathPenalty
+                        + (itemId.startsWith("applications-all") ? 2
+                            : itemId.startsWith("applications-recent") ? 1 : 0)
+                    visit(children, pathLabels.concat([String(item.label || "")]),
+                        nextPenalty, depth + 1)
+                    continue
+                }
+                // These entries create their contents dynamically and cannot
+                // produce searchable descendants until they are opened.
+                if (item.type === "submenu" || item.type === "applications"
+                        || item.type === "provider") continue
+                const clone = cloneSearchItem(item, pathLabels)
+                const identity = String(item.value || item.id || item.raw || item.label || "")
+                const identityKey = "$" + identity
+                if (identity && positionsByKey[identityKey] !== undefined) {
+                    const position = positionsByKey[identityKey]
+                    if (pathPenalty < flattened[position].searchPathPenalty) {
+                        clone.searchPathPenalty = pathPenalty
+                        flattened[position] = clone
+                    }
+                } else {
+                    clone.searchPathPenalty = pathPenalty
+                    if (identity) positionsByKey[identityKey] = flattened.length
+                    flattened.push(clone)
+                }
+            }
+        }
+        visit(roots, [], 0, 0)
+        return flattened
+    }
+
+    function resetSearchSource(sourceItems) {
+        rootSearchItems = sourceItems || []
+        searchIndexItems = buildSearchIndex(rootSearchItems)
+        searchResults = []
+        searchSelectedIndex = 0
+        searchRotationIndex = 0
+        searchPresentation = 0
+        searchTransitionActive = false
+        searchLeaving = false
+        searchContentPresentation = 0
+        searchContentAnimationActive = false
+        pendingSearchText = ""
+        searchRefreshPhase = ""
+        searchDebounceTimer.stop()
+    }
+
     function open(request, candidateText, promptText, responsePath, requestedProfile, inputFormat, requestedOutputMode, requestedScreen) {
         parentTransferHandoffTimer.stop()
         completionOwnershipTimer.stop()
@@ -205,6 +299,7 @@ QtObject {
         }
         allItems = parsed
         items = parsed
+        resetSearchSource(parsed)
         selectedIndex = 0
         rotationIndex = 0
         query = ""
@@ -245,6 +340,7 @@ QtObject {
         prompt = newPrompt
         navigationStack = []
         setItems(newItems)
+        resetSearchSource(newItems)
         query = ""
         searchMode = false
         show()
@@ -469,8 +565,14 @@ QtObject {
 
     function move(delta) {
         if (navigationLocked()) return
-        if (!items.length) return
-        const nextIndex = (selectedIndex + delta + items.length) % items.length
+        const movingItems = activeItems
+        if (!movingItems.length) return
+        if (searchMode) {
+            searchSelectedIndex = (searchSelectedIndex + delta + movingItems.length) % movingItems.length
+            if (movingItems.length > 6) searchRotationIndex += delta
+            return
+        }
+        const nextIndex = (selectedIndex + delta + movingItems.length) % movingItems.length
         selectedIndex = nextIndex
         // Small result sets fit in the fan at once. Keep their slots fixed
         // and move only the visual focus between them.
@@ -484,23 +586,90 @@ QtObject {
 
     function setSearch(text) {
         query = text
+        pendingSearchText = text
+        searchDebounceTimer.restart()
+    }
+
+    function filteredSearchResults(text) {
         const needle = text.toLowerCase()
-        items = needle.length ? allItems.filter(item => item.searchText.indexOf(needle) !== -1) : allItems
-        selectedIndex = Math.min(selectedIndex, Math.max(0, items.length - 1))
-        rotationIndex = items.length > 6 ? selectedIndex : 0
+        // Do not instantiate every application when the field is empty. A
+        // broad query is capped as well; additional typing narrows the same
+        // precomputed lightweight index without rebuilding the source tree.
+        return needle.length
+            ? searchIndexItems.filter(item => item.searchText.indexOf(needle) !== -1).slice(0, 100)
+            : []
+    }
+
+    function startSearchRefresh() {
+        if (!searchMode || searchLeaving) return
+        if (searchResults.length && searchContentPresentation > 0.001) {
+            searchRefreshPhase = "out"
+            searchContentAnimationActive = true
+        } else {
+            applyPendingSearch()
+        }
+    }
+
+    function applyPendingSearch() {
+        searchResults = filteredSearchResults(pendingSearchText)
+        searchSelectedIndex = 0
+        searchRotationIndex = 0
+        if (!searchResults.length) {
+            searchContentAnimationActive = false
+            searchContentPresentation = 0
+            searchRefreshPhase = ""
+        } else {
+            searchContentPresentation = 0
+            searchRefreshPhase = "in"
+            searchContentAnimationActive = true
+        }
     }
 
     function beginSearch() {
-        if (!searchMode) savedIndex = selectedIndex
+        if (navigationLocked()) return false
+        if (searchMode) return true
+        savedIndex = selectedIndex
         searchMode = true
+        searchLeaving = false
+        searchPresentation = 0
+        searchTransitionActive = true
+        return true
     }
 
     function endSearch() {
+        if (!searchMode || searchLeaving) return
+        searchDebounceTimer.stop()
+        searchContentAnimationActive = false
+        searchRefreshPhase = ""
+        searchLeaving = true
+        searchTransitionActive = true
+    }
+
+    function finishSearchTransition() {
+        searchPresentation = searchLeaving ? 0 : 1
+        searchTransitionActive = false
+        if (!searchLeaving) return
         searchMode = false
+        searchLeaving = false
         query = ""
-        items = allItems
-        selectedIndex = Math.min(savedIndex, Math.max(0, items.length - 1))
-        rotationIndex = items.length > 6 ? selectedIndex : 0
+        searchResults = []
+        searchSelectedIndex = 0
+        searchRotationIndex = 0
+        searchContentPresentation = 0
+        searchContentAnimationActive = false
+        pendingSearchText = ""
+        searchRefreshPhase = ""
+    }
+
+    function finishSearchContentAnimation() {
+        searchContentPresentation = 1
+        searchContentAnimationActive = false
+        searchRefreshPhase = ""
+    }
+
+    function finishSearchContentFadeOut() {
+        searchContentPresentation = 0
+        applyPendingSearch()
     }
 
     function respond(status, value) {
@@ -535,8 +704,9 @@ QtObject {
 
     function accept() {
         if (navigationLocked()) return
-        if (!items.length) return
-        const item = items[selectedIndex]
+        const acceptingItems = activeItems
+        if (!acceptingItems.length) return
+        const item = acceptingItems[activeSelectedIndex]
         if (item.disabled) return
         if (mode === "dmenu") {
             if (item.type === "submenu") { enterMenu(item.label, item.children); return }
@@ -563,6 +733,7 @@ QtObject {
     }
 
     function triggerKey(text) {
+        if (navigationLocked()) return false
         if (!text || searchMode) return false
         const needle = text.toLowerCase()
         for (let i = 0; i < items.length; ++i) {
@@ -580,8 +751,13 @@ QtObject {
 
     function focusFromPointer(index) {
         if (navigationLocked()) return
-        if (index < 0 || index >= items.length) return
-        selectedIndex = index
+        if (searchMode) {
+            if (index < 0 || index >= searchResults.length) return
+            searchSelectedIndex = index
+        } else {
+            if (index < 0 || index >= items.length) return
+            selectedIndex = index
+        }
     }
 
     function cancel() {
@@ -595,6 +771,12 @@ QtObject {
     property Timer revealTimer: Timer {
         interval: 16
         onTriggered: root.presenting = true
+    }
+
+    property Timer searchDebounceTimer: Timer {
+        interval: 70
+        repeat: false
+        onTriggered: root.startSearchRefresh()
     }
 
     property Timer menuEntryTimer: Timer {

@@ -3,6 +3,7 @@ import QtQuick
 Item {
     id: root
     required property var state
+    enabled: !state.searchMode
     property real radius: 545
     property real centerOffsetX: Config.centerOffsetX
     property real centerOffsetY: Config.centerOffsetY
@@ -566,6 +567,7 @@ Item {
                 ? targetHeight + (returnBaseHeight - targetHeight) * returnProgress : targetHeight
             modelData: root.displayItems[itemIndex]
             selected: itemIndex === root.displaySelectedParent
+            suppressSelectionGlow: root.state.searchMode
             forceSelectionGlow: selected
             circular: true
             animateSelection: false

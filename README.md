@@ -1,4 +1,4 @@
-# 要（Kaname）
+# 要 -Kaname-
 
 Kanameは、[Quickshell](https://quickshell.org/)で動作するNiri向けの扇形ランチャーです。
 画面右下から広がるUIで、アプリケーション、ユーザー定義メニュー、標準入力から渡した
@@ -293,7 +293,7 @@ kaname (--dmenu [--jsonl] [--output raw|value|id|json]
 - `Enter`: 選択、または子階層へ進む
 - `Left`: 子階層へ進む（既定、設定変更可能）
 - `Right` / `Backspace`: 親階層へ戻る
-- 文字入力: 検索
+- 文字入力: 全階層を横断検索。結果は外側の子階層帯へ表示
 - `Escape`: 検索を解除。検索中でなければ、どの階層からでも終了
 - マウスホイール: 選択移動
 - クリック: 選択または実行

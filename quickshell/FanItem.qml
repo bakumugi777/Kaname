@@ -15,11 +15,13 @@ Item {
     property bool animateFocus: true
     property real selectionGlowPulse: 0.45
     property real selectionGlowPresence: 0
+    property bool suppressSelectionGlow: false
+    property real selectionGlowVisibility: suppressSelectionGlow ? 0 : 1
     // Snapshot/parent-ring delegates suppress focus animations to avoid
     // handoff flicker, but may still need to preserve the selected glow.
     property bool forceSelectionGlow: false
-    readonly property real effectiveSelectionGlowPresence: forceSelectionGlow
-        && selected ? 1 : selectionGlowPresence
+    readonly property real effectiveSelectionGlowPresence: (forceSelectionGlow
+        && selected ? 1 : selectionGlowPresence) * selectionGlowVisibility
     property real entranceScale: 1
     property real exitScale: 1
     readonly property var safeData: modelData || ({ label: "", image: "", isImage: false })
@@ -52,7 +54,12 @@ Item {
             ? (iconName.startsWith("/") ? "file://" + iconName : iconName)
             : Quickshell.iconPath(iconName, true))
         : ""
-    readonly property bool isSubmenu: safeData.type === "submenu"
+    // A hierarchy entry is not always normalized to `submenu`: application
+    // sources and dynamic providers also open another level, while generic
+    // JSON input may communicate that solely through a children array.
+    readonly property bool opensLevel: safeData.type === "submenu"
+        || safeData.type === "applications" || safeData.type === "provider"
+        || (Array.isArray(safeData.children) && safeData.children.length > 0)
     property real itemOpacity: 0.92
     property real inactiveOpacity: Config.inactiveOpacity
     property real imageOpacity: Config.imageOpacity
@@ -117,6 +124,13 @@ Item {
     Behavior on opacity {
         enabled: root.animateOpacity
         NumberAnimation { duration: Config.motionDuration(Config.animationMs) }
+    }
+    Behavior on selectionGlowVisibility {
+        NumberAnimation {
+            duration: Config.motionDuration(root.suppressSelectionGlow
+                ? 150 : Math.max(280, Config.animationMs * 1.6))
+            easing.type: root.suppressSelectionGlow ? Easing.OutCubic : Easing.InOutCubic
+        }
     }
     NumberAnimation {
         id: glowIn
@@ -217,19 +231,36 @@ Item {
         border.width: 1 + 2 * root.effectiveSelectionGlowPresence
 
         // A permanent secondary ring marks items that open another level.
-        // It is intentionally distinct from the stronger selection halo.
+        // Keep it outside on idle items, but move it inside the selected card.
+        // Otherwise the selection halo obscures both outer contours.
         Rectangle {
             anchors.fill: parent
-            anchors.margins: -4
-            visible: root.circular && root.isSubmenu
+            property real ringMargin: root.selected ? 6 : -4
+            anchors.margins: ringMargin
+            visible: root.circular && root.opensLevel
+            z: 2
             radius: width / 2
             color: "transparent"
-            border.color: Theme.primary
-            border.width: 1
-            // Root application categories are all submenus. A fully bright
-            // hierarchy marker covered the selected glow there, so let the
-            // selection border remain visually dominant.
-            opacity: 0.48 - root.effectiveSelectionGlowPresence * 0.06
+            border.color: root.selected ? Qt.lighter(Theme.tertiary, 1.3) : Theme.primary
+            border.width: root.selected ? 2 : 1
+            opacity: root.selected ? 0.92 : 0.48
+            antialiasing: true
+
+            Behavior on ringMargin {
+                enabled: root.animateSelection
+                NumberAnimation {
+                    duration: Config.motionDuration(Config.animationMs)
+                    easing.type: Easing.OutCubic
+                }
+            }
+            Behavior on opacity {
+                enabled: root.animateFocus
+                NumberAnimation { duration: Config.motionDuration(160) }
+            }
+            Behavior on border.color {
+                enabled: root.animateFocus
+                ColorAnimation { duration: Config.motionDuration(160) }
+            }
         }
 
         Image {

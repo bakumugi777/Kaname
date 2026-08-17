@@ -3,6 +3,7 @@ import QtQuick
 Item {
     id: root
     required property var state
+    enabled: !state.searchMode
     // Captured by ParentRing at the instant a back navigation begins. These
     // are actual scene coordinates, not an inferred radius/angle.
     property var dismissTargets: []
@@ -181,6 +182,7 @@ Item {
 
             modelData: root.state.items[index]
             selected: index === root.state.selectedIndex
+            suppressSelectionGlow: root.state.searchMode
             // During a parent-return handoff this delegate is underneath the
             // snapshot layer. Keep both fully lit so releasing the snapshot
             // cannot expose a dark frame.
@@ -199,8 +201,10 @@ Item {
             // before being absorbed. The root return retains its soft fade.
             visualOpacity: root.state.childLayerHidden ? 0
                 : root.state.childDismissActive
-                    ? (deepDismiss ? 1 : root.state.childDismissProgress) : 1
-                * root.state.openingContentProgress
+                    ? (deepDismiss ? 1 : root.state.childDismissProgress)
+                    : root.state.openingContentProgress
+                        * (root.state.searchMode && root.state.navigationStack.length > 0
+                            ? 1 - root.state.searchPresentation : 1)
             entranceScale: 0.90 + root.state.openingContentProgress * 0.10
             // Enter the parent card rather than merely overlap its edge.
             exitScale: 1 - dismissProgress * 0.72
@@ -229,7 +233,11 @@ Item {
             z: selected ? 10 : Math.max(0, 5 - Math.abs(animatedOffset))
             rotation: circular ? 0 : boundedAngle - root.selectedAngle
 
-            onChosen: { root.state.selectedIndex = index; root.state.accept() }
+            onChosen: {
+                if (root.state.navigationLocked()) return
+                root.state.selectedIndex = index
+                root.state.accept()
+            }
             onScrolled: delta => root.state.move(delta > 0 ? 1 : -1)
             onFocusRequested: root.state.focusFromPointer(index)
 

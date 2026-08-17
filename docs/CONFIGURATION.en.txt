@@ -397,8 +397,11 @@ Open it with:
   disabled         true prevents activation
   workingDirectory Working directory for a command
 
-Bindings are local to the current level. Backspace outside search returns to
-the parent. Escape leaves search first; otherwise it closes the whole launcher
+Bindings are local to the current level. Search covers every already-loaded
+level and shows each result's hierarchy above its name in the bottom-right
+details. Runtime-generated provider children are not included in cross-level
+search. Backspace outside search returns to the parent.
+Escape leaves search first; otherwise it closes the whole launcher
 regardless of the current depth.
 
 
