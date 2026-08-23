@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/2b77a78d-5c62-4116-9ea9-0d84f519a222
+
 # 要 -Kaname-
 
 Kanameは、[Quickshell](https://quickshell.org/)で動作するNiri向けの扇形ランチャーです。
