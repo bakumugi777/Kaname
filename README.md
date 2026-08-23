@@ -1,6 +1,10 @@
 
 
-https://github.com/user-attachments/assets/2b77a78d-5c62-4116-9ea9-0d84f519a222
+
+
+https://github.com/user-attachments/assets/77fe86a0-b8b5-41ac-8f64-1f4019744572
+
+
 
 # 要 -Kaname-
 
