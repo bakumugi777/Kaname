@@ -9,7 +9,7 @@ Install Kaname through the Nix package manager.
 
 Options:
   --source FLAKE  Install from this flake reference (for example,
-                  github:OWNER/kaname). The default is this checkout.
+                  github:bakumugi777/kaname). The default is this checkout.
   --no-config     Do not install initial configuration files.
   --refresh       Replace existing configuration files after creating .bak
                   backups. Without this option, existing files are preserved.

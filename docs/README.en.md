@@ -39,7 +39,8 @@ Other compositors and Quickshell versions are not supported or guaranteed.
 
 ## Install from GitHub
 
-Replace `OWNER` with the GitHub account that hosts the repository.
+The commands and configuration examples below install Kaname from the official
+repository at `github.com/bakumugi777/kaname`.
 
 ### Recommended: install from the flake
 
@@ -51,7 +52,7 @@ Home Manager flake input:
 
 ```nix
 {
-  inputs.kaname.url = "github:OWNER/kaname";
+  inputs.kaname.url = "github:bakumugi777/kaname";
 }
 ```
 
@@ -89,7 +90,7 @@ kaname --applications
 Without Home Manager, install the package directly into a Nix profile:
 
 ```bash
-nix profile install github:OWNER/kaname#kaname
+nix profile install github:bakumugi777/kaname#kaname
 kaname --applications
 ```
 
@@ -100,7 +101,7 @@ you want initial configuration to be installed automatically.
 To try it without installing:
 
 ```bash
-nix run github:OWNER/kaname#kaname -- --applications
+nix run github:bakumugi777/kaname#kaname -- --applications
 ```
 
 The CLI starts Quickshell automatically when needed. Running `kaname-shell` as
@@ -111,7 +112,7 @@ a user service reduces first-open latency.
 On a Linux system with Nix already installed:
 
 ```bash
-git clone https://github.com/OWNER/kaname.git
+git clone https://github.com/bakumugi777/kaname.git
 cd kaname
 ./install.sh
 ```
@@ -125,7 +126,7 @@ itself or silently overwrites your configuration.
 ./install.sh --help
 ./install.sh --no-config
 ./install.sh --refresh    # back up existing files as .bak and replace them
-./install.sh --source github:OWNER/kaname
+./install.sh --source github:bakumugi777/kaname
 ```
 
 Environments other than NixOS/Niri are untested and unsupported.
@@ -443,7 +444,7 @@ it and applies later updates without restarting Quickshell.
 ## Development and diagnostics
 
 ```bash
-git clone https://github.com/OWNER/kaname.git
+git clone https://github.com/bakumugi777/kaname.git
 cd kaname
 nix develop
 nix run . -- --applications

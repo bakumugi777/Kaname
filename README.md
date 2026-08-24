@@ -48,7 +48,8 @@ Kaname自身は壁紙の探索・適用、動画再生、ダウンロード、�
 
 ## GitHubからインストール
 
-以下の`OWNER`は、公開したGitHubアカウント名へ置き換えてください。
+以下のコマンドと設定例は、公式リポジトリ
+`github.com/bakumugi777/kaname`から導入する場合のものです。
 
 ### 推奨: flakeから導入
 
@@ -61,7 +62,7 @@ Home Managerを使用する場合:
 ```nix
 # flake.nix
 {
-  inputs.kaname.url = "github:OWNER/kaname";
+  inputs.kaname.url = "github:bakumugi777/kaname";
 }
 ```
 
@@ -97,7 +98,7 @@ kaname --applications
 Home Managerを使わず、Nix profileへ直接インストールする場合:
 
 ```bash
-nix profile install github:OWNER/kaname#kaname
+nix profile install github:bakumugi777/kaname#kaname
 kaname --applications
 ```
 
@@ -107,7 +108,7 @@ kaname --applications
 インストールせず一時的に試す場合:
 
 ```bash
-nix run github:OWNER/kaname#kaname -- --applications
+nix run github:bakumugi777/kaname#kaname -- --applications
 ```
 
 `kaname-shell`を常駐させていなくても、`kaname` CLIは必要に応じてQuickshellを
@@ -118,7 +119,7 @@ nix run github:OWNER/kaname#kaname -- --applications
 Nixを導入済みのLinuxでは、リポジトリを取得して次を実行できます。
 
 ```bash
-git clone https://github.com/OWNER/kaname.git
+git clone https://github.com/bakumugi777/kaname.git
 cd kaname
 ./install.sh
 ```
@@ -130,7 +131,7 @@ cd kaname
 ./install.sh --help
 ./install.sh --no-config
 ./install.sh --refresh    # 既存設定を.bakへ退避して更新
-./install.sh --source github:OWNER/kaname
+./install.sh --source github:bakumugi777/kaname
 ```
 
 このスクリプトも内部ではflakeをNix profileへインストールします。Nix自体は
@@ -322,9 +323,9 @@ kaname (--dmenu [--jsonl] [--output raw|value|id|json]
 
 ```bash
 mkdir -p ~/.config/kaname
-cp "$(nix build --no-link --print-out-paths github:OWNER/kaname#kaname)/share/kaname/config/default.json" \
+cp "$(nix build --no-link --print-out-paths github:bakumugi777/kaname#kaname)/share/kaname/config/default.json" \
   ~/.config/kaname/config.json
-cp "$(nix build --no-link --print-out-paths github:OWNER/kaname#kaname)/share/kaname/config/menus.json" \
+cp "$(nix build --no-link --print-out-paths github:bakumugi777/kaname#kaname)/share/kaname/config/menus.json" \
   ~/.config/kaname/menus.json
 ```
 
@@ -467,7 +468,7 @@ Kanameは専用アイコンテーマを固定せず、Qt/デスクトップ環�
 ## ローカル開発
 
 ```bash
-git clone https://github.com/OWNER/kaname.git
+git clone https://github.com/bakumugi777/kaname.git
 cd kaname
 nix develop
 nix run . -- --applications
@@ -504,7 +505,7 @@ Wayland/Niri上の表示、フォーカス、アイコンテーマ、画像形�
 systemctl --user status kaname.service
 jq empty ~/.config/kaname/config.json
 jq empty ~/.config/kaname/menus.json
-quickshell log -p "$(nix build --no-link --print-out-paths github:OWNER/kaname#kaname)/share/kaname/quickshell" -t 100
+quickshell log -p "$(nix build --no-link --print-out-paths github:bakumugi777/kaname#kaname)/share/kaname/quickshell" -t 100
 ```
 
 設定を切り分ける場合は、既存ファイルを退避して同梱の初期設定で再現するか確認して
