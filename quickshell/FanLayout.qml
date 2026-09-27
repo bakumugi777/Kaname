@@ -248,14 +248,15 @@ Item {
                     easing.type: Easing.OutCubic
                 }
             }
-            Behavior on reveal {
-                enabled: !root.state.childRevealActive && !root.state.childDismissActive
-                    && !root.returningToParent
-                NumberAnimation {
-                    duration: Config.motionDuration(Math.max(300, Config.animationMs * 2) + Math.min(index, Config.visibleItems) * 22)
-                    easing.type: Easing.OutCubic
-                }
-            }
+            // Do not attach a Behavior to reveal. When two adjacent levels
+            // contain the same number of entries, Repeater keeps its existing
+            // delegates. Enabling childRevealActive then changes reveal from
+            // 1 to 0 on those delegates. A Behavior can observe that change
+            // before its enabled binding observes childRevealActive, causing
+            // the new model to animate briefly from its final slots back to
+            // the parent before the real reveal begins. Snap the retained
+            // delegates to reveal=0 instead; childRevealProgress supplies the
+            // one intentional, smooth parent-to-child animation.
         }
     }
 }
