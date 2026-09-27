@@ -49,14 +49,21 @@
         "label": "Browsers",
         "icon": "web-browser",
         "key": "b",
-        "match": ["WebBrowser", "Network"]
+        "match": [
+          "WebBrowser",
+          "Network"
+        ]
       },
       {
         "id": "settings",
         "label": "Settings",
         "icon": "preferences-system",
         "key": "s",
-        "match": ["Settings", "System", "HardwareSettings"]
+        "match": [
+          "Settings",
+          "System",
+          "HardwareSettings"
+        ]
       },
       {
         "id": "media",
@@ -69,21 +76,34 @@
             "label": "Music",
             "icon": "multimedia-player",
             "key": "m",
-            "match": ["Audio", "Music"]
+            "match": [
+              "Audio",
+              "Music"
+            ]
           },
           {
             "id": "images",
             "label": "Images",
             "icon": "image-x-generic",
             "key": "i",
-            "match": ["Graphics", "Photography", "2DGraphics", "RasterGraphics", "VectorGraphics"]
+            "match": [
+              "Graphics",
+              "Photography",
+              "2DGraphics",
+              "RasterGraphics",
+              "VectorGraphics"
+            ]
           },
           {
             "id": "videos",
             "label": "Videos",
             "icon": "video-x-generic",
             "key": "v",
-            "match": ["Video", "VideoEditing", "TV"]
+            "match": [
+              "Video",
+              "VideoEditing",
+              "TV"
+            ]
           }
         ]
       },
@@ -92,7 +112,14 @@
         "label": "Tools",
         "icon": "applications-utilities",
         "key": "t",
-        "match": ["Utility", "Development", "FileManager", "TerminalEmulator", "TextEditor", "Archiving"]
+        "match": [
+          "Utility",
+          "Development",
+          "FileManager",
+          "TerminalEmulator",
+          "TextEditor",
+          "Archiving"
+        ]
       }
     ],
     "recent": {
@@ -117,13 +144,26 @@
   },
   "profiles": {
     "applications": {
-      "geometry": { "visibleItems": 7, "itemWidth": 150, "itemHeight": 104 }
+      "geometry": {
+        "visibleItems": 7,
+        "itemWidth": 150,
+        "itemHeight": 104
+      }
     },
     "preview": {
-      "geometry": { "visibleItems": 5, "itemWidth": 220, "itemHeight": 140, "radius": 820 }
+      "geometry": {
+        "visibleItems": 7,
+        "itemWidth": 190,
+        "itemHeight": 120,
+        "radius": 820
+      }
     },
     "compact": {
-      "geometry": { "visibleItems": 5, "itemWidth": 124, "itemHeight": 88 }
+      "geometry": {
+        "visibleItems": 5,
+        "itemWidth": 124,
+        "itemHeight": 88
+      }
     }
   }
 }
