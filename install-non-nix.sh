@@ -11,7 +11,6 @@ Options:
   --prefix PATH         Installation prefix (default: ~/.local)
   --no-config           Do not install initial configuration files
   --refresh             Back up existing configuration as .bak and replace it
-  --skip-version-check  Allow a Quickshell version other than 0.3.0
   -h, --help            Show this help
 
 This script does not install system dependencies or use sudo.
@@ -27,7 +26,6 @@ script_dir=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 prefix=${HOME:?HOME is not set}/.local
 install_config=1
 refresh_config=0
-check_version=1
 
 while (($#)); do
   case "$1" in
@@ -42,10 +40,6 @@ while (($#)); do
       ;;
     --refresh)
       refresh_config=1
-      shift
-      ;;
-    --skip-version-check)
-      check_version=0
       shift
       ;;
     -h|--help)
@@ -64,16 +58,6 @@ for command_name in bash quickshell readlink sed tail mktemp seq sleep; do
   command -v "$command_name" >/dev/null 2>&1 || die \
     "required command not found: $command_name"
 done
-
-if ((check_version)); then
-  quickshell_version=$(quickshell --version 2>&1 || true)
-  case "$quickshell_version" in
-    *0.3.0*) ;;
-    *)
-      die "Quickshell 0.3.0 is required (found: ${quickshell_version:-unknown}). Use --skip-version-check at your own risk."
-      ;;
-  esac
-fi
 
 [[ -d "$script_dir/quickshell" ]] || die 'quickshell source directory is missing'
 [[ -d "$script_dir/config" ]] || die 'config source directory is missing'

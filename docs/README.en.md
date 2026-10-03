@@ -32,10 +32,11 @@ thumbnails. Those operations belong to the script which invokes the launcher.
 
 - NixOS
 - Niri / Wayland
-- Quickshell 0.3.0, pinned by `flake.lock`
+- Quickshell 0.3.1 (tested; not bundled with Kaname)
 - `x86_64-linux` or `aarch64-linux`
 
 Other compositors and Quickshell versions are not supported or guaranteed.
+Quickshell is installed independently from Kaname by the host system.
 
 ## Install from GitHub
 
@@ -45,8 +46,8 @@ repository at `github.com/bakumugi777/kaname`.
 ### Recommended: install from the flake
 
 The primary installation method is to reference Kaname's GitHub flake from
-NixOS or Home Manager. The locked flake resolves Kaname's Quickshell runtime
-and dependencies as one reproducible package.
+NixOS or Home Manager. Kaname does not pin or bundle a Quickshell runtime; the
+Home Manager module installs Quickshell from the user's nixpkgs.
 
 Home Manager flake input:
 
@@ -94,9 +95,10 @@ nix profile install github:bakumugi777/kaname#kaname
 kaname --applications
 ```
 
-`nix profile install` installs only the package; it does not generate files in
-your home directory. Use the Home Manager module above or `./install.sh` when
-you want initial configuration to be installed automatically.
+`nix profile install` installs only Kaname. Install Quickshell separately from
+your system or profile. It also does not generate files in your home directory;
+use the Home Manager module above or `./install.sh` when you want initial
+configuration to be installed automatically.
 
 To try it without installing:
 
@@ -133,7 +135,8 @@ Environments other than NixOS/Niri are untested and unsupported.
 
 ### Experimental installation without Nix
 
-After installing Quickshell 0.3.0 and Qt 6 through your distribution, run:
+After installing Quickshell (tested with 0.3.1) and Qt 6 through your
+distribution, run:
 
 ```bash
 ./install-non-nix.sh

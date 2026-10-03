@@ -1,11 +1,11 @@
 # Kaname implementation notes
 
-## Fixed runtime
+## Runtime compatibility
 
-The prototype targets **Quickshell 0.3.0**, as observed on the target NixOS
-machine. `flake.lock` pins the nixpkgs revision supplying it. Use `nix develop`
-or `nix run .`. The development shell rejects another Quickshell version because
-the pre-1.0 IPC and layer-shell APIs can change.
+Kaname is currently tested with **Quickshell 0.3.1**. The runtime is supplied by
+the host system and is not pinned or bundled by Kaname. The pre-1.0 IPC and
+layer-shell APIs can still change, so compatibility should be tested when those
+APIs change rather than rejecting every different version string.
 
 ## Window and IPC
 

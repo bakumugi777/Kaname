@@ -21,19 +21,16 @@
             version = "0.1.0";
             src = self;
             nativeBuildInputs = [ pkgs.makeWrapper ];
-            buildInputs = [ pkgs.qt6.qtimageformats ];
-            dontWrapQtApps = true;
             installPhase = ''
               mkdir -p $out/bin $out/share/kaname
               cp -r quickshell config matugen $out/share/kaname/
               install -Dm755 bin/kaname $out/libexec/kaname
+              install -Dm755 bin/kaname-shell $out/libexec/kaname-shell
               makeWrapper $out/libexec/kaname $out/bin/kaname \
                 --set KANAME_QML_DIR $out/share/kaname/quickshell \
-                --prefix QT_PLUGIN_PATH : ${pkgs.qt6.qtimageformats}/lib/qt-6/plugins \
-                --prefix PATH : ${nixpkgs.lib.makeBinPath [ pkgs.coreutils pkgs.quickshell ]}
-              makeWrapper ${pkgs.quickshell}/bin/quickshell $out/bin/kaname-shell \
-                --add-flags "-p $out/share/kaname/quickshell" \
-                --prefix QT_PLUGIN_PATH : ${pkgs.qt6.qtimageformats}/lib/qt-6/plugins
+                --prefix PATH : ${nixpkgs.lib.makeBinPath [ pkgs.coreutils ]}
+              makeWrapper $out/libexec/kaname-shell $out/bin/kaname-shell \
+                --set KANAME_QML_DIR $out/share/kaname/quickshell
             '';
             meta = {
               mainProgram = "kaname";
@@ -49,14 +46,7 @@
         let pkgs = import nixpkgs { inherit system; };
         in {
           default = pkgs.mkShell {
-            packages = [ pkgs.quickshell pkgs.qt6.qtdeclarative pkgs.qt6.qtimageformats pkgs.shellcheck ];
-            shellHook = ''
-              actual="$(quickshell --version 2>/dev/null || true)"
-              case "$actual" in *"0.3.0"*) ;; *)
-                echo "kaname: expected Quickshell 0.3.0, got: $actual" >&2
-                return 1
-              esac
-            '';
+            packages = [ pkgs.quickshell pkgs.shellcheck ];
           };
         });
     };

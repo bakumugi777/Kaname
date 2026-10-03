@@ -4,5 +4,11 @@ set -euo pipefail
 script_file=$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")
 install_root=$(CDPATH='' cd -- "$(dirname -- "$script_file")/.." && pwd)
 qs_bin=${KANAME_QS_BIN:-quickshell}
+qml_dir=${KANAME_QML_DIR:-"$install_root/quickshell"}
 
-exec "$qs_bin" -p "$install_root/quickshell" "$@"
+command -v "$qs_bin" >/dev/null 2>&1 || {
+  printf 'kaname-shell: Quickshell is required but was not found: %s\n' "$qs_bin" >&2
+  exit 127
+}
+
+exec "$qs_bin" -p "$qml_dir" "$@"

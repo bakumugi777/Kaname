@@ -40,11 +40,11 @@ Kaname自身は壁紙の探索・適用、動画再生、ダウンロード、�
 
 - NixOS
 - Niri / Wayland
-- Quickshell 0.3.0（`flake.lock`が実行環境を固定）
+- Quickshell 0.3.1（検証済み。Kanameには同梱しません）
 - `x86_64-linux`または`aarch64-linux`
 
 主な検証対象は作者のNixOS/Niri環境です。他のWaylandコンポジタやQuickshellの
-別バージョンは動作保証外です。
+別バージョンは動作保証外です。QuickshellはKanameとは独立してシステム側から導入します。
 
 ## GitHubからインストール
 
@@ -54,8 +54,8 @@ Kaname自身は壁紙の探索・適用、動画再生、ダウンロード、�
 ### 推奨: flakeから導入
 
 Kanameの標準的な導入方法は、GitHub上のflakeをNixOSまたはHome Managerから
-直接参照する方法です。`flake.lock`により、Kanameが使用するQuickshellと依存関係も
-同じ構成で解決されます。
+直接参照する方法です。KanameのflakeはQuickshellを固定・同梱せず、Home Manager
+moduleでは利用者側のnixpkgsからQuickshellを導入します。
 
 Home Managerを使用する場合:
 
@@ -102,8 +102,9 @@ nix profile install github:bakumugi777/kaname#kaname
 kaname --applications
 ```
 
-`nix profile install`はパッケージだけを導入し、ホームディレクトリの設定ファイルは
-生成しません。設定の自動配置には上記Home Manager moduleか`./install.sh`を使用します。
+`nix profile install`はKanameだけを導入します。別途、システムまたはprofileへ
+Quickshellを導入してください。ホームディレクトリの設定ファイルも生成しないため、
+設定の自動配置には上記Home Manager moduleか`./install.sh`を使用します。
 
 インストールせず一時的に試す場合:
 
@@ -140,7 +141,7 @@ cd kaname
 
 ### Nixを使わない実験的インストール
 
-Quickshell 0.3.0とQt 6をディストリビューション側で導入した後、ユーザー領域へ
+Quickshell（0.3.1で検証済み）とQt 6をディストリビューション側で導入した後、ユーザー領域へ
 インストールできます。
 
 ```bash

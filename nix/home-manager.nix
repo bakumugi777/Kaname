@@ -60,7 +60,9 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    home.packages = [ cfg.package ];
+    # Resolve Quickshell from the user's nixpkgs so it stays aligned with the
+    # rest of the graphical session instead of Kaname's locked flake input.
+    home.packages = [ cfg.package pkgs.quickshell ];
 
     xdg.configFile = {
       "kaname/config.json".source =
